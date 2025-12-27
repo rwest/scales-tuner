@@ -539,9 +539,11 @@ export default function ViolinTunerGame() {
         gap: 24,
         marginBottom: 16,
       }}>
-        {/* Pitch indicator */}
-        {gameState === 'playing' && currentPitch && (
-          <PitchIndicator cents={currentCents} />
+        {/* Pitch indicator - always visible during gameplay */}
+        {gameState === 'playing' && (
+          <div style={{ opacity: currentPitch ? 1 : 0.3 }}>
+            <PitchIndicator cents={currentPitch ? currentCents : 0} />
+          </div>
         )}
 
         {/* Tower */}
