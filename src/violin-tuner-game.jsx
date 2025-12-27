@@ -115,7 +115,7 @@ function PitchIndicator({ cents }) {
         position: 'absolute',
         width: '100%',
         height: '100%',
-        background: 'linear-gradient(to bottom, #ef4444 0%, #f97316 20%, #facc15 40%, #4ade80 50%, #facc15 60%, #f97316 80%, #ef4444 100%)',
+        background: 'linear-gradient(to bottom, #ef4444 0%, #f97316 20%, #facc15 40%, #22e55f 50%, #facc15 60%, #f97316 80%, #ef4444 100%)',
       }} />
       
       {/* Center line */}
@@ -239,6 +239,7 @@ export default function ViolinTunerGame() {
   const [holdProgress, setHoldProgress] = useState(0);
   const [collapseTime, setCollapseTime] = useState(null);
   const [error, setError] = useState(null);
+  const [score, setScore] = useState(0);
   
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -277,6 +278,7 @@ export default function ViolinTunerGame() {
       setInstability(0);
       setIsListening(true);
       setHoldProgress(0);
+      setScore(0);
       holdStartRef.current = null;
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
@@ -324,8 +326,18 @@ export default function ViolinTunerGame() {
           const newBrick = { index: bricks.length, angle };
           const newInstability = instability + Math.abs(angle);
           
+          // Calculate score based on accuracy (max points per note)
+          const maxPointsPerNote = 100 / scale.notes.length;
+          const absCents = Math.abs(cents);
+          let accuracy;
+          if (absCents < 5) accuracy = 1.0;      // Perfect
+          else if (absCents < 10) accuracy = 0.8; // Great
+          else accuracy = 0.6;                    // Good
+          const pointsEarned = maxPointsPerNote * accuracy;
+          
           setBricks(prev => [...prev, newBrick]);
           setInstability(newInstability);
+          setScore(prev => Math.round(prev + pointsEarned));
           setHoldProgress(0);
           holdStartRef.current = null;
           
@@ -372,7 +384,7 @@ export default function ViolinTunerGame() {
 
   const getTuningIndicator = () => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
-    if (Math.abs(currentCents) < IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#4ade80' };
+    if (Math.abs(currentCents) < IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#22e55f' };
     if (currentCents > 0) return { text: `Sharp (+${Math.round(currentCents)}¢)`, color: '#f97316' };
     return { text: `Flat (${Math.round(currentCents)}¢)`, color: '#3b82f6' };
   };
@@ -427,7 +439,7 @@ export default function ViolinTunerGame() {
             fontWeight: 'bold',
             borderRadius: 12,
             border: 'none',
-            background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+            background: 'linear-gradient(135deg, #22e55f 0%, #16c75c 100%)',
             color: '#fff',
             cursor: 'pointer',
             boxShadow: '0 4px 15px rgba(74, 222, 128, 0.4)',
@@ -464,6 +476,9 @@ export default function ViolinTunerGame() {
         <p style={{ color: '#94a3b8', margin: '4px 0' }}>
           Note {currentNoteIndex + 1} of {scale.notes.length}
         </p>
+        <div style={{ color: '#22e55f', fontSize: 24, fontWeight: 'bold', marginTop: 8 }}>
+          Score: {score}/100
+        </div>
       </div>
 
       {/* Current note display */}
@@ -497,7 +512,7 @@ export default function ViolinTunerGame() {
             <div style={{
               width: `${holdProgress * 100}%`,
               height: '100%',
-              background: holdProgress === 1 ? '#4ade80' : '#facc15',
+              background: holdProgress === 1 ? '#22e55f' : '#facc15',
               transition: 'width 0.05s linear',
             }} />
           </div>
@@ -525,7 +540,7 @@ export default function ViolinTunerGame() {
           <div style={{
             width: `${(1 - instability / COLLAPSE_THRESHOLD) * 100}%`,
             height: '100%',
-            background: instability < 50 ? '#4ade80' : instability < 75 ? '#facc15' : '#f87171',
+            background: instability < 50 ? '#22e55f' : instability < 75 ? '#facc15' : '#f87171',
             transition: 'all 0.3s ease',
           }} />
         </div>
@@ -593,6 +608,9 @@ export default function ViolinTunerGame() {
           <p style={{ color: '#94a3b8' }}>
             Made it to note {currentNoteIndex + 1} of {scale.notes.length}
           </p>
+          <div style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>
+            Final Score: {score}/100
+          </div>
           <button
             onClick={() => setGameState('menu')}
             style={{
@@ -616,8 +634,14 @@ export default function ViolinTunerGame() {
           textAlign: 'center',
           marginTop: 24,
         }}>
-          <h2 style={{ color: '#4ade80', fontSize: 28 }}>🎉 Perfect Scale!</h2>
+          <h2 style={{ color: '#22e55f', fontSize: 28 }}>🎉 Perfect Scale!</h2>
           <p style={{ color: '#94a3b8' }}>
+            Completed {selectedScale}
+          </p>
+          <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+            Score: {score}/100
+          </div>
+          <p style={{ color: '#94a3b8', marginTop: 4 }}>
             Tower stability: {Math.round((1 - instability / COLLAPSE_THRESHOLD) * 100)}%
           </p>
           <button
