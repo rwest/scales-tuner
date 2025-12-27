@@ -239,6 +239,7 @@ export default function ViolinTunerGame() {
   const [holdProgress, setHoldProgress] = useState(0);
   const [collapseTime, setCollapseTime] = useState(null);
   const [error, setError] = useState(null);
+  const [noCollapse, setNoCollapse] = useState(false);
   const [score, setScore] = useState(0);
   
   const audioContextRef = useRef(null);
@@ -341,7 +342,7 @@ export default function ViolinTunerGame() {
           setHoldProgress(0);
           holdStartRef.current = null;
           
-          if (newInstability >= COLLAPSE_THRESHOLD) {
+          if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
             // Tower collapses!
             setGameState('collapsed');
             setCollapseTime(Date.now());
@@ -430,6 +431,16 @@ export default function ViolinTunerGame() {
             ))}
           </select>
         </div>
+
+        <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
+          <input
+            type="checkbox"
+            checked={noCollapse}
+            onChange={(e) => setNoCollapse(e.target.checked)}
+            style={{ width: 18, height: 18 }}
+          />
+          Keep tower from collapsing
+        </label>
         
         <button
           onClick={startGame}
