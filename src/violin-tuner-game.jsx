@@ -468,52 +468,43 @@ export default function ViolinTunerGame() {
 
       {/* Current note display */}
       {gameState === 'playing' && (
-        <>
-          <div style={{
-            background: 'rgba(255,255,255,0.1)',
-            borderRadius: 16,
-            padding: '16px 32px',
-            marginBottom: 16,
-            textAlign: 'center',
-          }}>
-            <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
-              {currentNote}
-            </div>
-            <div style={{ color: '#94a3b8', fontSize: 14 }}>
-              {Math.round(targetFrequency)} Hz
-            </div>
-            <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
-              {tuning.text}
-            </div>
-            
-            {/* Hold progress bar */}
-            <div style={{
-              width: 150,
-              height: 8,
-              background: 'rgba(255,255,255,0.2)',
-              borderRadius: 4,
-              marginTop: 12,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${holdProgress * 100}%`,
-                height: '100%',
-                background: holdProgress === 1 ? '#4ade80' : '#facc15',
-                transition: 'width 0.05s linear',
-              }} />
-            </div>
-            <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-              Hold in tune...
-            </div>
+        <div style={{
+          background: 'rgba(255,255,255,0.1)',
+          borderRadius: 16,
+          padding: '16px 32px',
+          marginBottom: 16,
+          textAlign: 'center',
+        }}>
+          <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
+            {currentNote}
           </div>
-
-          {/* Pitch indicator */}
-          {currentPitch && (
-            <div style={{ marginBottom: 16 }}>
-              <PitchIndicator cents={currentCents} />
-            </div>
-          )}
-        </>
+          <div style={{ color: '#94a3b8', fontSize: 14 }}>
+            {Math.round(targetFrequency)} Hz
+          </div>
+          <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
+            {tuning.text}
+          </div>
+          
+          {/* Hold progress bar */}
+          <div style={{
+            width: 150,
+            height: 8,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: 4,
+            marginTop: 12,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${holdProgress * 100}%`,
+              height: '100%',
+              background: holdProgress === 1 ? '#4ade80' : '#facc15',
+              transition: 'width 0.05s linear',
+            }} />
+          </div>
+          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+            Hold in tune...
+          </div>
+        </div>
       )}
 
       {/* Instability meter */}
@@ -540,40 +531,54 @@ export default function ViolinTunerGame() {
         </div>
       </div>
 
-      {/* Tower */}
+      {/* Pitch indicator and Tower side by side */}
       <div style={{
-        position: 'relative',
-        width: 200,
-        height: 350,
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
+        gap: 24,
+        marginBottom: 16,
       }}>
-        {/* Ground */}
-        <div style={{
-          position: 'absolute',
-          bottom: -10,
-          width: 180,
-          height: 20,
-          background: 'linear-gradient(to top, #4a3728, #5c4333)',
-          borderRadius: 4,
-        }} />
-        
-        {/* Bricks */}
-        {gameState === 'collapsed' ? (
-          bricks.map((brick, i) => (
-            <FallingBrick key={i} brick={brick} startTime={collapseTime} />
-          ))
-        ) : (
-          bricks.map((brick, i) => (
-            <Brick
-              key={i}
-              index={brick.index}
-              angle={brick.angle}
-              isLatest={i === bricks.length - 1}
-            />
-          ))
+        {/* Pitch indicator */}
+        {gameState === 'playing' && currentPitch && (
+          <PitchIndicator cents={currentCents} />
         )}
+
+        {/* Tower */}
+        <div style={{
+          position: 'relative',
+          width: 200,
+          height: 350,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+        }}>
+          {/* Ground */}
+          <div style={{
+            position: 'absolute',
+            bottom: -10,
+            width: 180,
+            height: 20,
+            background: 'linear-gradient(to top, #4a3728, #5c4333)',
+            borderRadius: 4,
+          }} />
+          
+          {/* Bricks */}
+          {gameState === 'collapsed' ? (
+            bricks.map((brick, i) => (
+              <FallingBrick key={i} brick={brick} startTime={collapseTime} />
+            ))
+          ) : (
+            bricks.map((brick, i) => (
+              <Brick
+                key={i}
+                index={brick.index}
+                angle={brick.angle}
+                isLatest={i === bricks.length - 1}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       {/* Game over states */}
