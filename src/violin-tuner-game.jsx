@@ -95,6 +95,58 @@ function getCents(frequency, targetFrequency) {
   return 1200 * Math.log2(frequency / targetFrequency);
 }
 
+// Pitch indicator component
+function PitchIndicator({ cents }) {
+  const maxCents = 50; // +/- 50 cents range
+  const clampedCents = Math.max(-maxCents, Math.min(maxCents, cents));
+  const position = 50 - (clampedCents / maxCents) * 50; // 0-100%, inverted (0 = top = sharp)
+  
+  return (
+    <div style={{
+      position: 'relative',
+      width: 60,
+      height: 200,
+      borderRadius: 30,
+      overflow: 'hidden',
+      boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+    }}>
+      {/* Gradient bar */}
+      <div style={{
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        background: 'linear-gradient(to bottom, #ef4444 0%, #f97316 20%, #facc15 40%, #4ade80 50%, #facc15 60%, #f97316 80%, #ef4444 100%)',
+      }} />
+      
+      {/* Center line */}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
+        height: 2,
+        background: 'rgba(255,255,255,0.8)',
+        transform: 'translateY(-50%)',
+      }} />
+      
+      {/* Moving circle indicator */}
+      <div style={{
+        position: 'absolute',
+        top: `${position}%`,
+        left: '50%',
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        background: 'white',
+        border: '3px solid rgba(0,0,0,0.5)',
+        transform: 'translate(-50%, -50%)',
+        transition: 'top 0.1s ease-out',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      }} />
+    </div>
+  );
+}
+
 // Brick component
 function Brick({ index, angle, isLatest, opacity = 1 }) {
   const width = 60;
@@ -416,43 +468,52 @@ export default function ViolinTunerGame() {
 
       {/* Current note display */}
       {gameState === 'playing' && (
-        <div style={{
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: 16,
-          padding: '16px 32px',
-          marginBottom: 16,
-          textAlign: 'center',
-        }}>
-          <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
-            {currentNote}
-          </div>
-          <div style={{ color: '#94a3b8', fontSize: 14 }}>
-            {Math.round(targetFrequency)} Hz
-          </div>
-          <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
-            {tuning.text}
-          </div>
-          
-          {/* Hold progress bar */}
+        <>
           <div style={{
-            width: 150,
-            height: 8,
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: 4,
-            marginTop: 12,
-            overflow: 'hidden',
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: 16,
+            padding: '16px 32px',
+            marginBottom: 16,
+            textAlign: 'center',
           }}>
+            <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
+              {currentNote}
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: 14 }}>
+              {Math.round(targetFrequency)} Hz
+            </div>
+            <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
+              {tuning.text}
+            </div>
+            
+            {/* Hold progress bar */}
             <div style={{
-              width: `${holdProgress * 100}%`,
-              height: '100%',
-              background: holdProgress === 1 ? '#4ade80' : '#facc15',
-              transition: 'width 0.05s linear',
-            }} />
+              width: 150,
+              height: 8,
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 4,
+              marginTop: 12,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${holdProgress * 100}%`,
+                height: '100%',
+                background: holdProgress === 1 ? '#4ade80' : '#facc15',
+                transition: 'width 0.05s linear',
+              }} />
+            </div>
+            <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+              Hold in tune...
+            </div>
           </div>
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-            Hold in tune...
-          </div>
-        </div>
+
+          {/* Pitch indicator */}
+          {currentPitch && (
+            <div style={{ marginBottom: 16 }}>
+              <PitchIndicator cents={currentCents} />
+            </div>
+          )}
+        </>
       )}
 
       {/* Instability meter */}
