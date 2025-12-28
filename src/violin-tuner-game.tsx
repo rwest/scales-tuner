@@ -148,6 +148,11 @@ function getKeySignatureForScale(scaleName: ScaleName): string {
   return keyMap[scaleName];
 }
 
+// Friendly display for note names (use sharp/flat symbols)
+function formatNoteDisplay(note: string): string {
+  return note.replace(/#/g, '♯').replace(/b(?=\d)/g, '♭');
+}
+
 // Stave note display component
 interface StaveNoteDisplayProps {
   note: string;
@@ -169,7 +174,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 
       // Create SVG renderer
       const renderer = new Renderer(container, Renderer.Backends.SVG);
-      renderer.resize(180, 250);
+      renderer.resize(150, 150);
       const context = renderer.getContext();
       context.setFont('Arial', 10);
       
@@ -673,9 +678,6 @@ export default function ViolinTunerGame(): ReactNode {
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
         <h2 style={{ color: '#fff', margin: 0 }}>{selectedScale}</h2>
-        <p style={{ color: '#94a3b8', margin: '4px 0' }}>
-          Note {currentNoteIndex + 1} of {scale.notes.length}
-        </p>
         <div style={{ color: '#22e55f', fontSize: 24, fontWeight: 'bold', marginTop: 8 }}>
           Score: {score}/100
         </div>
@@ -686,18 +688,21 @@ export default function ViolinTunerGame(): ReactNode {
         <div style={{
           background: 'rgba(255,255,255,0.1)',
           borderRadius: 16,
-          padding: '16px 32px',
+          padding: '8px 32px',
           marginBottom: 16,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: 16,
         }}>
+        <p style={{ color: '#94a3b8', margin: '4px 0 -32px 0'}}>
+          Note {currentNoteIndex + 1} of {scale.notes.length}
+        </p>
           {/* Top row: Note name and stave */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
-                {currentNote}
+              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold'}}>
+                {currentNote ? formatNoteDisplay(currentNote) : ''}
               </div>
               <button
                 onClick={() => playTone(targetFrequency)}
@@ -707,7 +712,7 @@ export default function ViolinTunerGame(): ReactNode {
                   fontSize: 32,
                   cursor: 'pointer',
                   padding: '8px',
-                  marginTop: 4,
+                  marginTop: -12,
                   transition: 'transform 0.1s',
                 }}
                 onMouseDown={(e) => {
@@ -724,13 +729,12 @@ export default function ViolinTunerGame(): ReactNode {
                 🔊
               </button>
             </div>
-
             {/* Stave display */}
             <StaveNoteDisplay note={currentNote} keySignature={getKeySignatureForScale(selectedScale)} />
           </div>
 
           {/* Bottom row: Tuning feedback and progress */}
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', marginTop: '-32px' }}>
             <div style={{ color: tuning.color, fontSize: 18, fontWeight: 'bold' }}>
               {tuning.text}
             </div>
