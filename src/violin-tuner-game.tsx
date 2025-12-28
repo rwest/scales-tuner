@@ -187,13 +187,14 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       stave.addClef('treble').addKeySignature(keySignature);
       stave.setContext(context).draw();
 
-      // Create the note - parse note string (e.g., "B3" -> "B/3")
-      const noteParts = note.match(/([A-G]#?)(\d)/);
+      // Create the note - parse note string (e.g., "B3" -> "B/3", "Bb3" -> "Bb/3")
+      const noteParts = note.match(/([A-G])([#b]?)(\d)/);
       if (!noteParts) return;
 
-      const noteName = noteParts[1];
-      const octave = noteParts[2];
-      const noteString = `${noteName}/${octave}`;
+      const noteLetter = noteParts[1];
+      const accidental = noteParts[2];
+      const octave = noteParts[3];
+      const noteString = `${noteLetter}${accidental}/${octave}`;
 
       // Create note object (half note)
       const noteObj = new StaveNote({
