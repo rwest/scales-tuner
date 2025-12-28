@@ -199,7 +199,7 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
         position: 'absolute',
         width: '100%',
         height: '100%',
-        background: 'linear-gradient(to bottom, #ef4444 0%, #f97316 20%, #facc15 40%, #22e55f 50%, #facc15 60%, #f97316 80%, #ef4444 100%)',
+        background: 'linear-gradient(to bottom, #ef4444 0%, #22e55f 50%, #2a7afbff 100%)',
       }} />
       
       {/* Center line */}
@@ -237,7 +237,17 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
   const height = 16;
   const y = index * (height + 2);
   
-  const hue = Math.max(0, 142 - Math.abs(angle) * 9.5);
+  // Map angle to hue: flat (negative) = blue (240), perfect (0) = green (142), sharp (positive) = red (0)
+  let hue;
+  const maxAngle = 50;
+  if (angle >= 0) {
+    // Sharp: green (142) → red (0)
+    hue = 142 - (angle / maxAngle) * 142;
+  } else {
+    // Flat: green (142) → blue (240)
+    hue = 142 + (Math.abs(angle) / maxAngle) * (240 - 142);
+  }
+  hue = Math.max(0, Math.min(360, hue));
   const saturation = 100; //Math.min(Math.abs(angle) * 3, 80);
   
   return (
@@ -597,7 +607,7 @@ export default function ViolinTunerGame(): ReactNode {
               fontSize: 32,
               cursor: 'pointer',
               padding: '8px',
-              marginTop: 8,
+              marginTop: 4,
               transition: 'transform 0.1s',
             }}
             onMouseDown={(e) => {
