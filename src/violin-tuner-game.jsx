@@ -11,9 +11,6 @@ const NOTE_FREQUENCIES = {
   'Bb3': 233.08, 'Eb4': 311.13, 'Bb4': 466.16, 'Eb5': 622.25, 'Bb5': 932.33,
   'C#4': 277.18, 'C#5': 554.37, 'C#6': 1108.73,
   'G#4': 415.30, 'G#5': 830.61,
-  // For melodic minor
-  'E4': 329.63, 'F#4': 369.99, 'Eb4': 311.13,
-  'E5': 659.25, 'F#5': 739.99, 'Eb5': 622.25,
 };
 
 const SCALES = {
@@ -368,9 +365,7 @@ export default function ViolinTunerGame() {
       holdStartRef.current = null;
       setHoldProgress(0);
     }
-    
-    animationRef.current = requestAnimationFrame(detectPitch);
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse]);
 
   useEffect(() => {
     if (isListening) {
