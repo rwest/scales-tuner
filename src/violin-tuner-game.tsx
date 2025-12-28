@@ -1,7 +1,49 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode, CSSProperties } from 'react';
+
+// Type definitions
+type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
+type ScaleName = keyof typeof SCALES;
+
+interface NoteFrequencies {
+  [key: string]: number;
+}
+
+interface Scale {
+  notes: string[];
+}
+
+interface ScalesType {
+  [key: string]: Scale;
+}
+
+interface Brick {
+  index: number;
+  angle: number;
+}
+
+interface TuningIndicator {
+  text: string;
+  color: string;
+}
+
+interface PitchIndicatorProps {
+  cents: number;
+}
+
+interface BrickProps {
+  index: number;
+  angle: number;
+  isLatest: boolean;
+  opacity?: number;
+}
+
+interface FallingBrickProps {
+  brick: Brick;
+  startTime: number;
+}
 
 // Note frequencies for all scales (2 octaves)
-const NOTE_FREQUENCIES = {
+const NOTE_FREQUENCIES: NoteFrequencies = {
   'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'C4': 261.63, 'D4': 293.66,
   'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00, 'A4': 440.00,
   'B4': 493.88, 'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46,
@@ -13,7 +55,7 @@ const NOTE_FREQUENCIES = {
   'G#4': 415.30, 'G#5': 830.61,
 };
 
-const SCALES = {
+const SCALES: ScalesType = {
   'G Major': {
     notes: ['G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F#5', 'G5'],
   },
@@ -35,7 +77,7 @@ const SCALES = {
 };
 
 // Autocorrelation pitch detection
-function autoCorrelate(buffer, sampleRate) {
+function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
   const SIZE = buffer.length;
   let rms = 0;
   for (let i = 0; i < SIZE; i++) {
@@ -88,12 +130,12 @@ function autoCorrelate(buffer, sampleRate) {
 }
 
 // Calculate cents difference between two frequencies
-function getCents(frequency, targetFrequency) {
+function getCents(frequency: number, targetFrequency: number): number {
   return 1200 * Math.log2(frequency / targetFrequency);
 }
 
 // Pitch indicator component
-function PitchIndicator({ cents }) {
+function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
   const maxCents = 50; // +/- 50 cents range
   const clampedCents = Math.max(-maxCents, Math.min(maxCents, cents));
   const position = 50 - (clampedCents / maxCents) * 50; // 0-100%, inverted (0 = top = sharp)
@@ -145,7 +187,7 @@ function PitchIndicator({ cents }) {
 }
 
 // Brick component
-function Brick({ index, angle, isLatest, opacity = 1 }) {
+function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
   const width = 60;
   const height = 16;
   const y = index * (height + 2);
@@ -175,8 +217,8 @@ function Brick({ index, angle, isLatest, opacity = 1 }) {
 }
 
 // Falling brick animation
-function FallingBrick({ brick, startTime }) {
-  const [pos, setPos] = useState({ x: 0, y: 0, rotation: brick.angle });
+function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
+  const [pos, setPos] = useState<{ x: number; y: number; rotation: number }>({ x: 0, y: 0, rotation: brick.angle });
   
   useEffect(() => {
     const startY = brick.index * 18;
@@ -224,26 +266,26 @@ function FallingBrick({ brick, startTime }) {
 }
 
 // Main game component
-export default function ViolinTunerGame() {
-  const [gameState, setGameState] = useState('menu'); // menu, playing, collapsed, success
-  const [selectedScale, setSelectedScale] = useState('G Major');
-  const [currentNoteIndex, setCurrentNoteIndex] = useState(0);
-  const [bricks, setBricks] = useState([]);
-  const [instability, setInstability] = useState(0);
-  const [currentPitch, setCurrentPitch] = useState(null);
-  const [currentCents, setCurrentCents] = useState(0);
-  const [isListening, setIsListening] = useState(false);
-  const [holdProgress, setHoldProgress] = useState(0);
-  const [collapseTime, setCollapseTime] = useState(null);
-  const [error, setError] = useState(null);
-  const [noCollapse, setNoCollapse] = useState(false);
-  const [score, setScore] = useState(0);
+export default function ViolinTunerGame(): ReactNode {
+  const [gameState, setGameState] = useState<GameState>('menu');
+  const [selectedScale, setSelectedScale] = useState<ScaleName>('G Major');
+  const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(0);
+  const [bricks, setBricks] = useState<Brick[]>([]);
+  const [instability, setInstability] = useState<number>(0);
+  const [currentPitch, setCurrentPitch] = useState<number | null>(null);
+  const [currentCents, setCurrentCents] = useState<number>(0);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [holdProgress, setHoldProgress] = useState<number>(0);
+  const [collapseTime, setCollapseTime] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [noCollapse, setNoCollapse] = useState<boolean>(false);
+  const [score, setScore] = useState<number>(0);
   
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const animationRef = useRef(null);
-  const holdStartRef = useRef(null);
-  const streamRef = useRef(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const holdStartRef = useRef<number | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -378,7 +420,7 @@ export default function ViolinTunerGame() {
     };
   }, [isListening, detectPitch]);
 
-  const getTuningIndicator = () => {
+  const getTuningIndicator = (): TuningIndicator => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
     if (Math.abs(currentCents) < IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#22e55f' };
     if (currentCents > 0) return { text: `Sharp (+${Math.round(currentCents)}¢)`, color: '#f97316' };
