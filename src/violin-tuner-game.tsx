@@ -134,6 +134,51 @@ function getCents(frequency: number, targetFrequency: number): number {
   return 1200 * Math.log2(frequency / targetFrequency);
 }
 
+// Play a tone with harmonic richness (sounds louder than pure sine wave)
+function playTone(frequency: number, duration: number = 0.5): void {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContext.resume();
+    
+    const now = audioContext.currentTime;
+    const endTime = now + duration;
+    
+    // Create multiple oscillators with different frequencies (harmonics) for richer sound
+    const harmonics = [
+      { frequency: frequency, volume: 0.3 },           // Fundamental
+      { frequency: frequency * 2, volume: 0.15 },      // 2nd harmonic
+      { frequency: frequency * 3, volume: 0.1 },       // 3rd harmonic
+      { frequency: frequency * 4, volume: 0.08 },      // 4th harmonic
+    ];
+    
+    const masterGain = audioContext.createGain();
+    masterGain.connect(audioContext.destination);
+    
+    // Set envelope (attack, sustain, release)
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(0.5, now + 0.05);        // Attack
+    masterGain.gain.setValueAtTime(0.5, endTime - 0.1);              // Sustain
+    masterGain.gain.linearRampToValueAtTime(0, endTime);             // Release
+    
+    harmonics.forEach(({ frequency: freq, volume }) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.frequency.value = freq;
+      osc.type = 'triangle'; // Triangle wave for richer harmonics
+      gain.gain.setValueAtTime(volume, now);
+      
+      osc.connect(gain);
+      gain.connect(masterGain);
+      
+      osc.start(now);
+      osc.stop(endTime);
+    });
+  } catch (error) {
+    console.error('Error playing tone:', error);
+  }
+}
+
 // Pitch indicator component
 function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
   const maxCents = 50; // +/- 50 cents range
@@ -541,9 +586,30 @@ export default function ViolinTunerGame(): ReactNode {
           <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
             {currentNote}
           </div>
-          <div style={{ color: '#94a3b8', fontSize: 14 }}>
-            {Math.round(targetFrequency)} Hz
-          </div>
+          <button
+            onClick={() => playTone(targetFrequency)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: 32,
+              cursor: 'pointer',
+              padding: '8px',
+              marginTop: 8,
+              transition: 'transform 0.1s',
+            }}
+            onMouseDown={(e) => {
+              (e.target as HTMLElement).style.transform = 'scale(0.9)';
+            }}
+            onMouseUp={(e) => {
+              (e.target as HTMLElement).style.transform = 'scale(1)';
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLElement).style.transform = 'scale(1)';
+            }}
+            title={`${Math.round(targetFrequency)} Hz`}
+          >
+            🔊
+          </button>
           <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
             {tuning.text}
           </div>
