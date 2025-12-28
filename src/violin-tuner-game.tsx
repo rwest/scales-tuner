@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, ReactNode, CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 
 // Type definitions
 type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
@@ -223,7 +223,7 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
   useEffect(() => {
     const startY = brick.index * 18;
     const direction = brick.angle > 0 ? 1 : -1;
-    let frame;
+    let frame: number;
     
     const animate = () => {
       const elapsed = (Date.now() - startTime) / 1000;
@@ -301,7 +301,7 @@ export default function ViolinTunerGame(): ReactNode {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       await audioContext.resume();
       
       const source = audioContext.createMediaStreamSource(stream);
@@ -345,7 +345,7 @@ export default function ViolinTunerGame(): ReactNode {
     const buffer = new Float32Array(analyserRef.current.fftSize);
     analyserRef.current.getFloatTimeDomainData(buffer);
     
-    const pitch = autoCorrelate(buffer, audioContextRef.current.sampleRate);
+    const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
     
     if (pitch > 0 && pitch > 150 && pitch < 1500) {
       setCurrentPitch(pitch);
@@ -631,7 +631,7 @@ export default function ViolinTunerGame(): ReactNode {
           {/* Bricks */}
           {gameState === 'collapsed' ? (
             bricks.map((brick, i) => (
-              <FallingBrick key={i} brick={brick} startTime={collapseTime} />
+              <FallingBrick key={i} brick={brick} startTime={collapseTime!} />
             ))
           ) : (
             bricks.map((brick, i) => (
