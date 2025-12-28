@@ -384,86 +384,89 @@ export default function ViolinTunerGame(): ReactNode {
     }
   }, []);
 
-  const detectPitch = useCallback(() => {
-    if (!analyserRef.current || !isListening) return;
+  useEffect(() => {
+    if (!isListening) return;
 
-    const buffer = new Float32Array(analyserRef.current.fftSize);
-    analyserRef.current.getFloatTimeDomainData(buffer);
-    
-    const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
-    
-    if (pitch > 0 && pitch > 150 && pitch < 1500) {
-      setCurrentPitch(pitch);
-      const cents = getCents(pitch, targetFrequency);
-      setCurrentCents(cents);
+    const detectPitchLoop = () => {
+      if (!analyserRef.current || !isListening) return;
+
+      const buffer = new Float32Array(analyserRef.current.fftSize);
+      analyserRef.current.getFloatTimeDomainData(buffer);
       
-      // Check if in tune
-      if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
-        if (!holdStartRef.current) {
-          holdStartRef.current = Date.now();
-        }
-        const holdTime = Date.now() - holdStartRef.current;
-        setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
+      const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
+      
+      if (pitch > 0 && pitch > 150 && pitch < 1500) {
+        setCurrentPitch(pitch);
+        const cents = getCents(pitch, targetFrequency);
+        setCurrentCents(cents);
         
-        if (holdTime >= HOLD_DURATION) {
-          // Note accepted!
-          const angle = cents * 1.5; // Convert cents to angle
-          const newBrick = { index: bricks.length, angle };
-          const newInstability = instability + Math.abs(angle);
+        // Check if in tune
+        if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
+          if (!holdStartRef.current) {
+            holdStartRef.current = Date.now();
+          }
+          const holdTime = Date.now() - holdStartRef.current;
+          setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
           
-          // Calculate score based on accuracy (max points per note)
-          const maxPointsPerNote = 100 / scale.notes.length;
-          const absCents = Math.abs(cents);
-          let accuracy;
-          if (absCents < 5) accuracy = 1.0;      // Perfect
-          else if (absCents < 10) accuracy = 0.8; // Great
-          else accuracy = 0.6;                    // Good
-          const pointsEarned = maxPointsPerNote * accuracy;
-          
-          setBricks(prev => [...prev, newBrick]);
-          setInstability(newInstability);
-          setScore(prev => Math.round(prev + pointsEarned));
-          setHoldProgress(0);
+          if (holdTime >= HOLD_DURATION) {
+            // Note accepted!
+            const angle = cents * 1.5; // Convert cents to angle
+            const newBrick = { index: bricks.length, angle };
+            const newInstability = instability + Math.abs(angle);
+            
+            // Calculate score based on accuracy (max points per note)
+            const maxPointsPerNote = 100 / scale.notes.length;
+            const absCents = Math.abs(cents);
+            let accuracy;
+            if (absCents < 5) accuracy = 1.0;      // Perfect
+            else if (absCents < 10) accuracy = 0.8; // Great
+            else accuracy = 0.6;                    // Good
+            const pointsEarned = maxPointsPerNote * accuracy;
+            
+            setBricks(prev => [...prev, newBrick]);
+            setInstability(newInstability);
+            setScore(prev => Math.round(prev + pointsEarned));
+            setHoldProgress(0);
+            holdStartRef.current = null;
+            
+            if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
+              // Tower collapses!
+              setGameState('collapsed');
+              setCollapseTime(Date.now());
+              stopGame();
+              return;
+            }
+            
+            if (currentNoteIndex + 1 >= scale.notes.length) {
+              // Scale complete!
+              setGameState('success');
+              stopGame();
+              return;
+            }
+            
+            setCurrentNoteIndex(prev => prev + 1);
+          }
+        } else {
           holdStartRef.current = null;
-          
-          if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
-            // Tower collapses!
-            setGameState('collapsed');
-            setCollapseTime(Date.now());
-            stopGame();
-            return;
-          }
-          
-          if (currentNoteIndex + 1 >= scale.notes.length) {
-            // Scale complete!
-            setGameState('success');
-            stopGame();
-            return;
-          }
-          
-          setCurrentNoteIndex(prev => prev + 1);
+          setHoldProgress(0);
         }
       } else {
+        setCurrentPitch(null);
         holdStartRef.current = null;
         setHoldProgress(0);
       }
-    } else {
-      setCurrentPitch(null);
-      holdStartRef.current = null;
-      setHoldProgress(0);
-    }
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse]);
 
-  useEffect(() => {
-    if (isListening) {
-      animationRef.current = requestAnimationFrame(detectPitch);
-    }
+      animationRef.current = requestAnimationFrame(detectPitchLoop);
+    };
+
+    animationRef.current = requestAnimationFrame(detectPitchLoop);
+    
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, detectPitch]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse]);
 
   const getTuningIndicator = (): TuningIndicator => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
