@@ -252,9 +252,9 @@ export default function ViolinTunerGame() {
   const currentNote = scale?.notes[currentNoteIndex];
   const targetFrequency = NOTE_FREQUENCIES[currentNote];
 
-  const HOLD_DURATION = 500; // ms to hold note in tune
-  const IN_TUNE_THRESHOLD = 15; // cents
-  const COLLAPSE_THRESHOLD = 100; // instability points
+  const HOLD_DURATION = 750; // ms to hold note in tune
+  const IN_TUNE_THRESHOLD = 18; // cents
+  const COLLAPSE_THRESHOLD = 120; // instability points
 
   const startGame = async () => {
     setError(null);
