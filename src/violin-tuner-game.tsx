@@ -169,12 +169,16 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 
       // Create SVG renderer
       const renderer = new Renderer(container, Renderer.Backends.SVG);
-      renderer.resize(200, 150);
+      renderer.resize(180, 250);
       const context = renderer.getContext();
       context.setFont('Arial', 10);
+      
+      // Set colors to white
+      context.setStrokeStyle('white');
+      context.setFillStyle('white');
 
       // Create stave
-      const stave = new Stave(10, 40, 180);
+      const stave = new Stave(10, 10, 120);
       stave.addClef('treble').addKeySignature(keySignature);
       stave.setContext(context).draw();
 
@@ -191,6 +195,10 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
         keys: [noteString],
         duration: 'h',
       });
+      
+      // Set note color to white
+      noteObj.setStyle({ fillStyle: 'white', strokeStyle: 'white' });
+      noteObj.setLedgerLineStyle({ strokeStyle: '#d1d5db' }); // Pale grey for ledger lines
 
       // Format and draw
       const voice = new Voice({ num_beats: 2, beat_value: 4 });
@@ -198,7 +206,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 
       new Formatter()
         .joinVoices([voice])
-        .format([voice], 160);
+        .format([voice], 120);
 
       voice.draw(context, stave);
     } catch (error) {
@@ -213,7 +221,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 200,
+        minWidth: 160,
         minHeight: 150,
       }}
     />
@@ -681,38 +689,49 @@ export default function ViolinTunerGame(): ReactNode {
           padding: '16px 32px',
           marginBottom: 16,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          gap: 24,
+          gap: 16,
         }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
-              {currentNote}
+          {/* Top row: Note name and stave */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
+                {currentNote}
+              </div>
+              <button
+                onClick={() => playTone(targetFrequency)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 32,
+                  cursor: 'pointer',
+                  padding: '8px',
+                  marginTop: 4,
+                  transition: 'transform 0.1s',
+                }}
+                onMouseDown={(e) => {
+                  (e.target as HTMLElement).style.transform = 'scale(0.9)';
+                }}
+                onMouseUp={(e) => {
+                  (e.target as HTMLElement).style.transform = 'scale(1)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLElement).style.transform = 'scale(1)';
+                }}
+                title={`${Math.round(targetFrequency)} Hz`}
+              >
+                🔊
+              </button>
             </div>
-            <button
-              onClick={() => playTone(targetFrequency)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: 32,
-                cursor: 'pointer',
-                padding: '8px',
-                marginTop: 4,
-                transition: 'transform 0.1s',
-              }}
-              onMouseDown={(e) => {
-                (e.target as HTMLElement).style.transform = 'scale(0.9)';
-              }}
-              onMouseUp={(e) => {
-                (e.target as HTMLElement).style.transform = 'scale(1)';
-              }}
-              onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.transform = 'scale(1)';
-              }}
-              title={`${Math.round(targetFrequency)} Hz`}
-            >
-              🔊
-            </button>
-            <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
+
+            {/* Stave display */}
+            <StaveNoteDisplay note={currentNote} keySignature={getKeySignatureForScale(selectedScale)} />
+          </div>
+
+          {/* Bottom row: Tuning feedback and progress */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: tuning.color, fontSize: 18, fontWeight: 'bold' }}>
               {tuning.text}
             </div>
             
@@ -735,14 +754,6 @@ export default function ViolinTunerGame(): ReactNode {
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
               Hold in tune...
             </div>
-          </div>
-
-          {/* Stave display */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8 }}>
-              {getKeySignatureForScale(selectedScale)}
-            </div>
-            <StaveNoteDisplay note={currentNote} keySignature={getKeySignatureForScale(selectedScale)} />
           </div>
         </div>
       )}
