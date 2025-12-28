@@ -153,8 +153,8 @@ function Brick({ index, angle, isLatest, opacity = 1 }) {
   const height = 16;
   const y = index * (height + 2);
   
-  const hue = Math.abs(angle) < 5 ? 142 : Math.abs(angle) < 15 ? 45 : 0;
-  const saturation = Math.min(Math.abs(angle) * 3, 80);
+  const hue = Math.max(0, 142 - Math.abs(angle) * 9.5);
+  const saturation = 100; //Math.min(Math.abs(angle) * 3, 80);
   
   return (
     <div
