@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import { Factory, EasyScore } from 'vexflow';
 
 // Type definitions
 type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
@@ -132,6 +133,70 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
 // Calculate cents difference between two frequencies
 function getCents(frequency: number, targetFrequency: number): number {
   return 1200 * Math.log2(frequency / targetFrequency);
+}
+
+// Map scale names to VexFlow key signatures
+function getKeySignatureForScale(scaleName: ScaleName): string {
+  const keyMap: { [key in ScaleName]: string } = {
+    'G Major': 'G',
+    'G Minor Melodic': 'Bb', // G Melodic Minor has 2 flats
+    'Bb Major': 'Bb',
+    'A Major': 'A',
+    'A Minor Melodic': 'C', // A Melodic Minor has no key signature accidentals
+    'D Major': 'D',
+  };
+  return keyMap[scaleName];
+}
+
+// Stave note display component
+interface StaveNoteDisplayProps {
+  note: string;
+  keySignature: string;
+}
+
+function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactNode {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Clear previous content
+    containerRef.current.innerHTML = '';
+
+    try {
+      const vf = new Factory({
+        renderer: { elementId: containerRef.current, width: 180, height: 120 },
+      });
+
+      const score = vf.EasyScore();
+      const system = vf.System();
+
+      // Add stave with treble clef and key signature, no time signature
+      system
+        .addStave({
+          voices: [score.voice(score.notes(`${note}/h`, { stem: 'up' }))],
+        })
+        .addClef('treble')
+        .addKeySignature(keySignature);
+
+      vf.draw();
+    } catch (error) {
+      console.error('Error rendering stave:', error);
+    }
+  }, [note, keySignature]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 180,
+        minHeight: 120,
+      }}
+    />
+  );
 }
 
 // Play a tone with harmonic richness (sounds louder than pure sine wave)
@@ -594,57 +659,69 @@ export default function ViolinTunerGame(): ReactNode {
           borderRadius: 16,
           padding: '16px 32px',
           marginBottom: 16,
-          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
         }}>
-          <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
-            {currentNote}
-          </div>
-          <button
-            onClick={() => playTone(targetFrequency)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 32,
-              cursor: 'pointer',
-              padding: '8px',
-              marginTop: 4,
-              transition: 'transform 0.1s',
-            }}
-            onMouseDown={(e) => {
-              (e.target as HTMLElement).style.transform = 'scale(0.9)';
-            }}
-            onMouseUp={(e) => {
-              (e.target as HTMLElement).style.transform = 'scale(1)';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLElement).style.transform = 'scale(1)';
-            }}
-            title={`${Math.round(targetFrequency)} Hz`}
-          >
-            🔊
-          </button>
-          <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
-            {tuning.text}
-          </div>
-          
-          {/* Hold progress bar */}
-          <div style={{
-            width: 150,
-            height: 8,
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: 4,
-            marginTop: 12,
-            overflow: 'hidden',
-          }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold' }}>
+              {currentNote}
+            </div>
+            <button
+              onClick={() => playTone(targetFrequency)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: 32,
+                cursor: 'pointer',
+                padding: '8px',
+                marginTop: 4,
+                transition: 'transform 0.1s',
+              }}
+              onMouseDown={(e) => {
+                (e.target as HTMLElement).style.transform = 'scale(0.9)';
+              }}
+              onMouseUp={(e) => {
+                (e.target as HTMLElement).style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.transform = 'scale(1)';
+              }}
+              title={`${Math.round(targetFrequency)} Hz`}
+            >
+              🔊
+            </button>
+            <div style={{ color: tuning.color, fontSize: 18, marginTop: 8, fontWeight: 'bold' }}>
+              {tuning.text}
+            </div>
+            
+            {/* Hold progress bar */}
             <div style={{
-              width: `${holdProgress * 100}%`,
-              height: '100%',
-              background: holdProgress === 1 ? '#22e55f' : '#facc15',
-              transition: 'width 0.05s linear',
-            }} />
+              width: 150,
+              height: 8,
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 4,
+              marginTop: 12,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${holdProgress * 100}%`,
+                height: '100%',
+                background: holdProgress === 1 ? '#22e55f' : '#facc15',
+                transition: 'width 0.05s linear',
+              }} />
+            </div>
+            <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+              Hold in tune...
+            </div>
           </div>
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-            Hold in tune...
+
+          {/* Stave display */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8 }}>
+              {getKeySignatureForScale(selectedScale)}
+            </div>
+            <StaveNoteDisplay note={currentNote} keySignature={getKeySignatureForScale(selectedScale)} />
           </div>
         </div>
       )}
