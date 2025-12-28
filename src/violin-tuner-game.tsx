@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import { Factory, EasyScore } from 'vexflow';
+import Vex from 'vexflow';
 
 // Type definitions
 type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
@@ -155,45 +155,66 @@ interface StaveNoteDisplayProps {
 }
 
 function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactNode {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerId = `stave-${note}-${keySignature}`;
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
 
     // Clear previous content
-    containerRef.current.innerHTML = '';
+    container.innerHTML = '';
 
     try {
-      const vf = new Factory({
-        renderer: { elementId: containerRef.current, width: 180, height: 120 },
+      const { Renderer, Stave, StaveNote, Voice, Formatter } = Vex.Flow;
+
+      // Create SVG renderer
+      const renderer = new Renderer(container, Renderer.Backends.SVG);
+      renderer.resize(200, 150);
+      const context = renderer.getContext();
+      context.setFont('Arial', 10);
+
+      // Create stave
+      const stave = new Stave(10, 40, 180);
+      stave.addClef('treble').addKeySignature(keySignature);
+      stave.setContext(context).draw();
+
+      // Create the note - parse note string (e.g., "B3" -> "B/3")
+      const noteParts = note.match(/([A-G]#?)(\d)/);
+      if (!noteParts) return;
+
+      const noteName = noteParts[1];
+      const octave = noteParts[2];
+      const noteString = `${noteName}/${octave}`;
+
+      // Create note object (half note)
+      const noteObj = new StaveNote({
+        keys: [noteString],
+        duration: 'h',
       });
 
-      const score = vf.EasyScore();
-      const system = vf.System();
+      // Format and draw
+      const voice = new Voice({ num_beats: 2, beat_value: 4 });
+      voice.addTickables([noteObj]);
 
-      // Add stave with treble clef and key signature, no time signature
-      system
-        .addStave({
-          voices: [score.voice(score.notes(`${note}/h`, { stem: 'up' }))],
-        })
-        .addClef('treble')
-        .addKeySignature(keySignature);
+      new Formatter()
+        .joinVoices([voice])
+        .format([voice], 160);
 
-      vf.draw();
+      voice.draw(context, stave);
     } catch (error) {
       console.error('Error rendering stave:', error);
     }
-  }, [note, keySignature]);
+  }, [note, keySignature, containerId]);
 
   return (
     <div
-      ref={containerRef}
+      id={containerId}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 180,
-        minHeight: 120,
+        minWidth: 200,
+        minHeight: 150,
       }}
     />
   );
