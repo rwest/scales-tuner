@@ -153,6 +153,24 @@ function formatNoteDisplay(note: string): string {
   return note.replace(/#/g, '♯').replace(/b(?=\d)/g, '♭');
 }
 
+// Key signature accidentals lookup (treble clef)
+const KEY_SIGNATURE_ACCIDENTALS: Record<string, Record<string, '#' | 'b'>> = {
+  // Sharps
+  'G': { F: '#' },
+  'D': { F: '#', C: '#' },
+  'A': { F: '#', C: '#', G: '#' },
+  // Flats
+  'Bb': { B: 'b', E: 'b' },
+  'Eb': { B: 'b', E: 'b', A: 'b' },
+  // Natural
+  'C': {},
+};
+
+function getKeyAccidental(keySignature: string, letter: string): '#' | 'b' | null {
+  const map = KEY_SIGNATURE_ACCIDENTALS[keySignature] || {};
+  return map[letter.toUpperCase()] || null;
+}
+
 // Stave note display component
 interface StaveNoteDisplayProps {
   note: string;
@@ -170,7 +188,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
     container.innerHTML = '';
 
     try {
-      const { Renderer, Stave, StaveNote, Voice, Formatter } = Vex.Flow;
+      const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
 
       // Create SVG renderer
       const renderer = new Renderer(container, Renderer.Backends.SVG);
@@ -201,6 +219,23 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
         keys: [noteString],
         duration: 'h',
       });
+      
+      // Determine if we need to show an accidental (including naturals against key signature)
+      const keySigAcc = getKeyAccidental(keySignature, noteLetter);
+      const noteAcc: '#' | 'b' | null = accidental === '#' ? '#' : accidental === 'b' ? 'b' : null;
+      let renderAcc: string | null = null;
+
+      if (noteAcc !== keySigAcc) {
+        if (noteAcc === null && keySigAcc) {
+          renderAcc = 'n'; // natural to cancel key signature accidental
+        } else if (noteAcc) {
+          renderAcc = noteAcc; // sharp or flat explicit
+        }
+      }
+
+      if (renderAcc) {
+        noteObj.addAccidental(0, new Accidental(renderAcc));
+      }
       
       // Set note color to white
       noteObj.setStyle({ fillStyle: 'white', strokeStyle: 'white' });
