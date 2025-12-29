@@ -270,7 +270,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 160,
+        minWidth: 150,
         minHeight: 150,
       }}
     />
@@ -289,8 +289,8 @@ function playTone(frequency: number, duration: number = 0.5): void {
     // Create multiple oscillators with different frequencies (harmonics) for richer sound
     const harmonics = [
       { frequency: frequency, volume: 0.3 },           // Fundamental
-      { frequency: frequency * 2, volume: 0.15 },      // 2nd harmonic
-      { frequency: frequency * 3, volume: 0.1 },       // 3rd harmonic
+      { frequency: frequency * 2.005, volume: 0.15 },      // 2nd harmonic
+      { frequency: frequency * 3.01, volume: 0.1 },       // 3rd harmonic
       { frequency: frequency * 4, volume: 0.08 },      // 4th harmonic
     ];
     
@@ -754,7 +754,7 @@ export default function ViolinTunerGame(): ReactNode {
           {/* Top row: Note name and stave */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold'}}>
+              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold', minWidth: 100 }}>
                 {currentNote ? formatNoteDisplay(currentNote) : ''}
               </div>
               <button
@@ -803,8 +803,8 @@ export default function ViolinTunerGame(): ReactNode {
             }}>
               <div style={{
                 width: `${holdProgress * 100}%`,
-                height: '100%',
-                background: holdProgress === 1 ? '#22e55f' : '#facc15',
+                height: '100%','121'
+                background: holdProgress === 1 ? '#ffffff' : '#22e55f',
                 transition: 'width 0.05s linear',
               }} />
             </div>
