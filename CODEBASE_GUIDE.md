@@ -6,6 +6,11 @@ Welcome to the **Scale Tuner** project! This document provides a comprehensive o
 
 **Scale Tuner** (also called "Scale Tower") is a browser-based violin tuner game built with React and Vite. Players practice musical scales by playing into their microphone, earning points for accurate intonation, and building a tower that collapses if their tuning becomes too inconsistent.
 
+### Links
+- **Live Demo**: [https://rwest.github.io/scales-tuner/](https://rwest.github.io/scales-tuner/)
+- **Repository**: [https://github.com/rwest/scales-tuner](https://github.com/rwest/scales-tuner)
+- **Deployment**: Automatic via GitHub Actions on push to main branch
+
 ### Core Gameplay Loop
 1. Player selects a scale and a mode (Practice or Test), and optionally enables "Keep tower from collapsing".
 2. Game displays the target note on both a musical staff and as text with a play button.
@@ -22,6 +27,9 @@ Welcome to the **Scale Tuner** project! This document provides a comprehensive o
 
 ```
 scale-tuner/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # GitHub Actions deployment workflow
 ├── public/                          # Static assets
 ├── src/
 │   ├── scales-tuner.tsx            # Main game component
@@ -320,7 +328,29 @@ Search for score calculation in the `detectPitchLoop` function.
 - **No External UI Library**: Uses HTML/CSS for DOM rendering
 - **Event-Driven**: Audio processing runs each animation frame for responsive feedback
 
-## 📚 References
+## � Deployment
+
+The project is automatically deployed to GitHub Pages via GitHub Actions.
+
+### Deployment Workflow
+- Located in [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+- Triggers on push to `main` branch or manual workflow dispatch
+- Builds the project using `npm run build`
+- Deploys the `dist/` folder to GitHub Pages
+
+### Production URL
+- **Live site**: [https://rwest.github.io/scales-tuner/](https://rwest.github.io/scales-tuner/)
+
+### Manual Deployment
+To deploy manually:
+```bash
+npm run build          # Build production files to dist/
+git add dist/          # Stage the build
+git commit -m "Deploy" # Commit
+git push origin main   # Push triggers automatic deployment
+```
+
+### 📚 References
 
 - [Web Audio API Docs](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
 - [React Documentation](https://react.dev)
