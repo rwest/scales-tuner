@@ -164,6 +164,11 @@ function formatNoteDisplay(note: string): string {
   return note.replace(/#/g, '♯').replace(/b(?=\d)/g, '♭');
 }
 
+// Friendly display for scale names (use sharp/flat symbols)
+function formatScaleName(name: string): string {
+  return name.replace(/([A-G])b\b/g, '$1♭').replace(/#/g, '♯');
+}
+
 // Key signature accidentals lookup (treble clef)
 const KEY_SIGNATURE_ACCIDENTALS: Record<string, Record<string, '#' | 'b'>> = {
   // Sharps
@@ -741,7 +746,7 @@ export default function ViolinTunerGame(): ReactNode {
             }}
           >
             {Object.keys(SCALES).map(name => (
-              <option key={name} value={name}>{name}</option>
+              <option key={name} value={name}>{formatScaleName(name)}</option>
             ))}
           </select>
         </div>
@@ -815,7 +820,7 @@ export default function ViolinTunerGame(): ReactNode {
     }}>
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <h2 style={{ color: '#fff', margin: 0 }}>{selectedScale}</h2>
+        <h2 style={{ color: '#fff', margin: 0 }}>{formatScaleName(selectedScale)}</h2>
         <div style={{ color: '#22e55f', fontSize: 24, fontWeight: 'bold', marginTop: 8 }}>
           Score: {score}/100
         </div>
