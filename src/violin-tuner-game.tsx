@@ -499,6 +499,7 @@ export default function ViolinTunerGame(): ReactNode {
   const noteStartTimeRef = useRef<number | null>(null);
   const timeInRangeRef = useRef<number>(0);
   const testSamplesRef = useRef<number[]>([]);
+  const practiceSamplesRef = useRef<number[]>([]);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -584,6 +585,8 @@ export default function ViolinTunerGame(): ReactNode {
           
           if (gameMode === 'practice') {
             // Practice mode: check if in tune
+            practiceSamplesRef.current.push(cents);
+
             if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
               if (!holdStartRef.current) {
                 holdStartRef.current = Date.now();
@@ -593,8 +596,10 @@ export default function ViolinTunerGame(): ReactNode {
               
               if (holdTime >= HOLD_DURATION) {
                 // Note accepted!
-                const totalTimeForNote = Date.now() - noteStartTimeRef.current!;
-                const noteScore = Math.exp(-(totalTimeForNote - HOLD_DURATION) / HOLD_DURATION);
+                const avgAbsCents = practiceSamplesRef.current.length
+                  ? practiceSamplesRef.current.reduce((sum, c) => sum + Math.abs(c), 0) / practiceSamplesRef.current.length
+                  : 0;
+                const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
                 
                 const angle = cents * 1.5;
                 const newBrick = { index: bricks.length, angle };
@@ -606,6 +611,7 @@ export default function ViolinTunerGame(): ReactNode {
                 setHoldProgress(0);
                 holdStartRef.current = null;
                 noteStartTimeRef.current = null;
+                practiceSamplesRef.current = [];
                 
                 // Normalize score to 100
                 const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
@@ -679,6 +685,7 @@ export default function ViolinTunerGame(): ReactNode {
           holdStartRef.current = null;
           noteStartTimeRef.current = null;
           testSamplesRef.current = [];
+          practiceSamplesRef.current = [];
           setHoldProgress(0);
         }
       } else {
@@ -686,6 +693,7 @@ export default function ViolinTunerGame(): ReactNode {
         holdStartRef.current = null;
         noteStartTimeRef.current = null;
         testSamplesRef.current = [];
+        practiceSamplesRef.current = [];
         setHoldProgress(0);
       }
 

@@ -30,7 +30,7 @@ A browser-based violin tuner game built with React and Vite. Play scales into yo
 - **Practice Mode**
 	- Timing runs only while you are within the same-note threshold (recognizing the correct target).
 	- Advance when you stay in-tune for the hold duration.
-	- Per-note score ≈ `exp(-(time_taken − HOLD_DURATION)/HOLD_DURATION)`.
+	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of samples collected while in-range).
 
 - **Test Mode**
 	- Collects pitch samples for the hold duration while within the same-note threshold; auto-advances afterward.

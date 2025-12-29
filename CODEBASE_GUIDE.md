@@ -105,7 +105,7 @@ The heart of the application. This 967-line component contains:
 - **Accuracy Calculation**: Converts frequency to cents deviation from target note
 - **Modes**:
   - **Practice**: Timer runs only while within `SAME_NOTE_THRESHOLD`. Advance when in-tune (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION`.
-    - Per-note score: \(\exp\big(\!-(\text{time\_taken} - \text{HOLD\_DURATION})/\text{HOLD\_DURATION}\big)\)
+    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using samples collected while in-range.
   - **Test**: Collect samples for `HOLD_DURATION` while within `SAME_NOTE_THRESHOLD`, average absolute cents, then auto-advance (even if not in-tune).
     - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\)
 - **Score Normalization**: Sum per-note scores and normalize to a 100-point total across the scale.
