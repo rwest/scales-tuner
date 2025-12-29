@@ -894,7 +894,7 @@ export default function ViolinTunerGame(): ReactNode {
               <div style={{
                 width: `${holdProgress * 100}%`,
                 height: '100%',
-                background: holdProgress === 1 ? '#ffffff' : '#22e55f',
+                background: gameMode === 'test' ? '#ffffff' : '#22e55f',
                 transition: 'width 0.05s linear',
               }} />
             </div>
@@ -1017,7 +1017,7 @@ export default function ViolinTunerGame(): ReactNode {
           textAlign: 'center',
           marginTop: 24,
         }}>
-          <h2 style={{ color: '#22e55f', fontSize: 28 }}>🎉 Perfect Scale!</h2>
+          <h2 style={{ color: '#22e55f', fontSize: 28 }}>🎉 Completed Scale!</h2>
           <p style={{ color: '#94a3b8' }}>
             Completed {selectedScale}
           </p>
