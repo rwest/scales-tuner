@@ -219,9 +219,13 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       const noteString = `${noteLetter}${accidental}/${octave}`;
 
       // Create note object (half note)
+      // Determine stem direction: notes above B4 should have stem down
+      const noteComparison = `${noteLetter}${octave}`;
+      const shouldStemDown = (octave > '4');
       const noteObj = new StaveNote({
         keys: [noteString],
         duration: 'h',
+        stem_direction: shouldStemDown ? -1 : 1,
       });
       
       // Determine if we need to show an accidental (including naturals against key signature)
