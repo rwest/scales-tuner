@@ -376,18 +376,27 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
   const height = 16;
   const y = index * (height + 2);
   
-  // Map angle to hue: flat (negative) = blue (240), perfect (0) = green (142), sharp (positive) = red (0)
-  let hue;
+  // Map angle to color using same gradient as pitch indicator
+  // sharp (positive) = red, perfect (0) = green, flat (negative) = blue
   const maxAngle = 50;
-  if (angle >= 0) {
-    // Sharp: green (142) → red (0)
-    hue = 142 - (angle / maxAngle) * 142;
+  const normalizedAngle = Math.max(-maxAngle, Math.min(maxAngle, angle)) / maxAngle; // -1 to 1
+  
+  let color;
+  if (normalizedAngle > 0) {
+    // sharp: interpolate from green to red
+    const t = normalizedAngle; // 0 to 1
+    const r = Math.round(34 + (239 - 34) * t);   // #22 to #ef
+    const g = Math.round(229 - (229 - 68) * t);  // #e5 to #44
+    const b = Math.round(95 - (95 - 68) * t);    // #5f to #44
+    color = `rgb(${r}, ${g}, ${b})`;
   } else {
-    // Flat: green (142) → blue (240)
-    hue = 142 + (Math.abs(angle) / maxAngle) * (240 - 142);
+    // flat: interpolate from green to blue
+    const t = Math.abs(normalizedAngle); // 0 to 1
+    const r = Math.round(34 - (34 - 42) * t);    // #22 to #2a
+    const g = Math.round(229 - (229 - 122) * t); // #e5 to #7a
+    const b = Math.round(95 + (255 - 95) * t);   // #5f to #fb
+    color = `rgb(${r}, ${g}, ${b})`;
   }
-  hue = Math.max(0, Math.min(360, hue));
-  const saturation = 100; //Math.min(Math.abs(angle) * 3, 80);
   
   return (
     <div
@@ -397,7 +406,7 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
         left: '50%',
         width: width,
         height: height,
-        backgroundColor: `hsl(${hue}, ${saturation}%, 45%)`,
+        backgroundColor: color,
         border: '2px solid rgba(0,0,0,0.3)',
         borderRadius: 3,
         transform: `translateX(-50%) rotate(${angle}deg)`,
