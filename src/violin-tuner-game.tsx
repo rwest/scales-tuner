@@ -3,6 +3,7 @@ import Vex from 'vexflow';
 
 // Type definitions
 type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
+type GameMode = 'practice' | 'test';
 type ScaleName = keyof typeof SCALES;
 
 interface NoteFrequencies {
@@ -475,6 +476,7 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
 // Main game component
 export default function ViolinTunerGame(): ReactNode {
   const [gameState, setGameState] = useState<GameState>('menu');
+  const [gameMode, setGameMode] = useState<GameMode>('practice');
   const [selectedScale, setSelectedScale] = useState<ScaleName>('G Major');
   const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(0);
   const [bricks, setBricks] = useState<Brick[]>([]);
@@ -487,12 +489,16 @@ export default function ViolinTunerGame(): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const [noCollapse, setNoCollapse] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
+  const [noteScores, setNoteScores] = useState<number[]>([]);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const holdStartRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const noteStartTimeRef = useRef<number | null>(null);
+  const timeInRangeRef = useRef<number>(0);
+  const testSamplesRef = useRef<number[]>([]);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -500,10 +506,12 @@ export default function ViolinTunerGame(): ReactNode {
 
   const HOLD_DURATION = 750; // ms to hold note in tune
   const IN_TUNE_THRESHOLD = 18; // cents
+  const SAME_NOTE_THRESHOLD = 50; // cents - for recognizing correct note
   const COLLAPSE_THRESHOLD = 120; // instability points
 
-  const startGame = async () => {
+  const startGame = async (mode: GameMode) => {
     setError(null);
+    setGameMode(mode);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -526,7 +534,11 @@ export default function ViolinTunerGame(): ReactNode {
       setIsListening(true);
       setHoldProgress(0);
       setScore(0);
+      setNoteScores([]);
       holdStartRef.current = null;
+      noteStartTimeRef.current = null;
+      timeInRangeRef.current = 0;
+      testSamplesRef.current = [];
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
       console.error(err);
@@ -562,59 +574,119 @@ export default function ViolinTunerGame(): ReactNode {
         const cents = getCents(pitch, targetFrequency);
         setCurrentCents(cents);
         
-        // Check if in tune
-        if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
-          if (!holdStartRef.current) {
-            holdStartRef.current = Date.now();
+        const withinSameNote = Math.abs(cents) < SAME_NOTE_THRESHOLD;
+        
+        if (withinSameNote) {
+          // Start timing if not already started
+          if (!noteStartTimeRef.current) {
+            noteStartTimeRef.current = Date.now();
           }
-          const holdTime = Date.now() - holdStartRef.current;
-          setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
           
-          if (holdTime >= HOLD_DURATION) {
-            // Note accepted!
-            const angle = cents * 1.5; // Convert cents to angle
-            const newBrick = { index: bricks.length, angle };
-            const newInstability = instability + Math.abs(angle);
-            
-            // Calculate score based on accuracy (max points per note)
-            const maxPointsPerNote = 100 / scale.notes.length;
-            const absCents = Math.abs(cents);
-            let accuracy;
-            if (absCents < 5) accuracy = 1.0;      // Perfect
-            else if (absCents < 10) accuracy = 0.8; // Great
-            else accuracy = 0.6;                    // Good
-            const pointsEarned = maxPointsPerNote * accuracy;
-            
-            setBricks(prev => [...prev, newBrick]);
-            setInstability(newInstability);
-            setScore(prev => Math.round(prev + pointsEarned));
-            setHoldProgress(0);
-            holdStartRef.current = null;
-            
-            if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
-              // Tower collapses!
-              setGameState('collapsed');
-              setCollapseTime(Date.now());
-              stopGame();
-              return;
+          if (gameMode === 'practice') {
+            // Practice mode: check if in tune
+            if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
+              if (!holdStartRef.current) {
+                holdStartRef.current = Date.now();
+              }
+              const holdTime = Date.now() - holdStartRef.current;
+              setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
+              
+              if (holdTime >= HOLD_DURATION) {
+                // Note accepted!
+                const totalTimeForNote = Date.now() - noteStartTimeRef.current!;
+                const noteScore = Math.exp(-(totalTimeForNote - HOLD_DURATION) / HOLD_DURATION);
+                
+                const angle = cents * 1.5;
+                const newBrick = { index: bricks.length, angle };
+                const newInstability = instability + Math.abs(angle);
+                
+                setBricks(prev => [...prev, newBrick]);
+                setInstability(newInstability);
+                setNoteScores(prev => [...prev, noteScore]);
+                setHoldProgress(0);
+                holdStartRef.current = null;
+                noteStartTimeRef.current = null;
+                
+                // Normalize score to 100
+                const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
+                const maxPossibleScore = currentNoteIndex + 1; // each note can score max 1.0
+                const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
+                setScore(normalizedScore);
+                
+                if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
+                  setGameState('collapsed');
+                  setCollapseTime(Date.now());
+                  stopGame();
+                  return;
+                }
+                
+                if (currentNoteIndex + 1 >= scale.notes.length) {
+                  setGameState('success');
+                  stopGame();
+                  return;
+                }
+                
+                setCurrentNoteIndex(prev => prev + 1);
+              }
+            } else {
+              holdStartRef.current = null;
+              setHoldProgress(0);
             }
+          } else {
+            // Test mode: collect samples
+            const elapsedInRange = Date.now() - noteStartTimeRef.current!;
+            testSamplesRef.current.push(cents);
+            setHoldProgress(Math.min(elapsedInRange / HOLD_DURATION, 1));
             
-            if (currentNoteIndex + 1 >= scale.notes.length) {
-              // Scale complete!
-              setGameState('success');
-              stopGame();
-              return;
+            if (elapsedInRange >= HOLD_DURATION) {
+              // Calculate average error
+              const avgAbsCents = testSamplesRef.current.reduce((sum, c) => sum + Math.abs(c), 0) / testSamplesRef.current.length;
+              const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
+              
+              const angle = avgAbsCents * 1.5 * (testSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
+              const newBrick = { index: bricks.length, angle };
+              const newInstability = instability + Math.abs(angle);
+              
+              setBricks(prev => [...prev, newBrick]);
+              setInstability(newInstability);
+              setNoteScores(prev => [...prev, noteScore]);
+              setHoldProgress(0);
+              noteStartTimeRef.current = null;
+              testSamplesRef.current = [];
+              
+              // Normalize score to 100
+              const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
+              const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
+              setScore(normalizedScore);
+              
+              if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
+                setGameState('collapsed');
+                setCollapseTime(Date.now());
+                stopGame();
+                return;
+              }
+              
+              if (currentNoteIndex + 1 >= scale.notes.length) {
+                setGameState('success');
+                stopGame();
+                return;
+              }
+              
+              setCurrentNoteIndex(prev => prev + 1);
             }
-            
-            setCurrentNoteIndex(prev => prev + 1);
           }
         } else {
+          // Outside SAME_NOTE_THRESHOLD - reset
           holdStartRef.current = null;
+          noteStartTimeRef.current = null;
+          testSamplesRef.current = [];
           setHoldProgress(0);
         }
       } else {
         setCurrentPitch(null);
         holdStartRef.current = null;
+        noteStartTimeRef.current = null;
+        testSamplesRef.current = [];
         setHoldProgress(0);
       }
 
@@ -628,7 +700,7 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores]);
 
   const getTuningIndicator = (): TuningIndicator => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
@@ -689,22 +761,40 @@ export default function ViolinTunerGame(): ReactNode {
           Keep tower from collapsing
         </label>
         
-        <button
-          onClick={startGame}
-          style={{
-            padding: '16px 48px',
-            fontSize: 20,
-            fontWeight: 'bold',
-            borderRadius: 12,
-            border: 'none',
-            background: 'linear-gradient(135deg, #22e55f 0%, #16c75c 100%)',
-            color: '#fff',
-            cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(74, 222, 128, 0.4)',
-          }}
-        >
-          Start
-        </button>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <button
+            onClick={() => startGame('practice')}
+            style={{
+              padding: '16px 48px',
+              fontSize: 20,
+              fontWeight: 'bold',
+              borderRadius: 12,
+              border: 'none',
+              background: 'linear-gradient(135deg, #22e55f 0%, #16c75c 100%)',
+              color: '#fff',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(74, 222, 128, 0.4)',
+            }}
+          >
+            Practice
+          </button>
+          <button
+            onClick={() => startGame('test')}
+            style={{
+              padding: '16px 48px',
+              fontSize: 20,
+              fontWeight: 'bold',
+              borderRadius: 12,
+              border: 'none',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              color: '#fff',
+              cursor: 'pointer',
+              boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)',
+            }}
+          >
+            Test
+          </button>
+        </div>
         
         {error && (
           <p style={{ color: '#f87171', marginTop: 16, textAlign: 'center' }}>{error}</p>
@@ -803,13 +893,13 @@ export default function ViolinTunerGame(): ReactNode {
             }}>
               <div style={{
                 width: `${holdProgress * 100}%`,
-                height: '100%','121'
+                height: '100%',
                 background: holdProgress === 1 ? '#ffffff' : '#22e55f',
                 transition: 'width 0.05s linear',
               }} />
             </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-              Hold in tune...
+              {gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...'}
             </div>
           </div>
         </div>
