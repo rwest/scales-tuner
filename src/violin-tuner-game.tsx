@@ -234,7 +234,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       }
 
       if (renderAcc) {
-        noteObj.addAccidental(0, new Accidental(renderAcc));
+        noteObj.addModifier(new Accidental(renderAcc));
       }
       
       // Set note color to white
