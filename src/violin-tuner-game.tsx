@@ -196,7 +196,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
 
       // Create SVG renderer
-      const renderer = new Renderer(container, Renderer.Backends.SVG);
+      const renderer = new Renderer(container as HTMLDivElement, Renderer.Backends.SVG);
       renderer.resize(150, 150);
       const context = renderer.getContext();
       context.setFont('Arial', 10);
@@ -221,8 +221,8 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 
       // Create note object (half note)
       // Determine stem direction: notes above B4 should have stem down
-      const noteComparison = `${noteLetter}${octave}`;
-      const shouldStemDown = (octave > '4');
+      const octaveNum = parseInt(octave, 10);
+      const shouldStemDown = octaveNum >= 5;
       const noteObj = new StaveNote({
         keys: [noteString],
         duration: 'h',
@@ -609,7 +609,6 @@ export default function ViolinTunerGame(): ReactNode {
                 
                 // Normalize score to 100
                 const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
-                const maxPossibleScore = currentNoteIndex + 1; // each note can score max 1.0
                 const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
                 setScore(normalizedScore);
                 
