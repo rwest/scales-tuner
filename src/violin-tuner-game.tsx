@@ -503,6 +503,7 @@ export default function ViolinTunerGame(): ReactNode {
   const holdStartRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const noteStartTimeRef = useRef<number | null>(null);
+  const accumulatedInRangeRef = useRef<number>(0);
   const noteSamplesRef = useRef<number[]>([]);
 
   const scale = SCALES[selectedScale];
@@ -542,6 +543,7 @@ export default function ViolinTunerGame(): ReactNode {
       setNoteScores([]);
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
+      accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
@@ -565,9 +567,17 @@ export default function ViolinTunerGame(): ReactNode {
   useEffect(() => {
     if (!isListening) return;
 
-    const resetNoteTracking = () => {
+    const pauseInRangeTimer = () => {
+      if (noteStartTimeRef.current) {
+        accumulatedInRangeRef.current += Date.now() - noteStartTimeRef.current;
+        noteStartTimeRef.current = null;
+      }
+    };
+
+    const resetForNextNote = () => {
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
+      accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
       setHoldProgress(0);
     };
@@ -584,7 +594,7 @@ export default function ViolinTunerGame(): ReactNode {
       const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
       setScore(normalizedScore);
 
-      resetNoteTracking();
+      resetForNextNote();
 
       if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
         setGameState('collapsed');
@@ -648,7 +658,7 @@ export default function ViolinTunerGame(): ReactNode {
             }
           } else {
             // Test mode: collect samples
-            const elapsedInRange = Date.now() - noteStartTimeRef.current!;
+            const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
             noteSamplesRef.current.push(cents);
             setHoldProgress(Math.min(elapsedInRange / HOLD_DURATION, 1));
             
@@ -663,12 +673,16 @@ export default function ViolinTunerGame(): ReactNode {
             }
           }
         } else {
-          // Outside SAME_NOTE_THRESHOLD - reset
-          resetNoteTracking();
+          // Outside SAME_NOTE_THRESHOLD - pause timers, keep samples
+          pauseInRangeTimer();
+          holdStartRef.current = null;
+          setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0);
         }
       } else {
         setCurrentPitch(null);
-        resetNoteTracking();
+        pauseInRangeTimer();
+        holdStartRef.current = null;
+        setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0);
       }
 
       animationRef.current = requestAnimationFrame(detectPitchLoop);

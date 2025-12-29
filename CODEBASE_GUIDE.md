@@ -103,11 +103,12 @@ The heart of the application. This 967-line component contains:
 
 #### **Game Logic**
 - **Accuracy Calculation**: Converts frequency to cents deviation from target note
+- **Sample Collection**: Both modes collect cents samples whenever within `SAME_NOTE_THRESHOLD`; samples persist across pauses/silence until note completion.
 - **Modes**:
-  - **Practice**: Timer runs only while within `SAME_NOTE_THRESHOLD`. Advance when in-tune (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION`.
-    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using samples collected while in-range.
-  - **Test**: Collect samples for `HOLD_DURATION` while within `SAME_NOTE_THRESHOLD`, average absolute cents, then auto-advance (even if not in-tune).
-    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\)
+  - **Practice**: Advance when continuously in-tune (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION`. Leaving in-tune resets hold timer but keeps samples.
+    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using all samples collected during the note attempt.
+  - **Test**: Accumulates time while within `SAME_NOTE_THRESHOLD`; pauses timer when out-of-range or silent. Auto-advances after `HOLD_DURATION` of accumulated in-range time (even if not in-tune).
+    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using all samples collected.
 - **Score Normalization**: Sum per-note scores and normalize to a 100-point total across the scale.
 - **Instability System**: Accumulates based on brick angle; collapses at 120 points (unless "Keep tower from collapsing" enabled).
 - **Color System**: Bricks and pitch indicator use matching gradient (red→green→blue)
@@ -176,18 +177,18 @@ Cents measure pitch deviation: 100 cents = 1 semitone (half-step)
 
 ### Scoring System
 - Total: Normalize the sum of per-note scores to 100 points for the entire scale.
-- Practice Mode per-note: \(\exp\big(\!-(\text{time\_taken} - \text{HOLD\_DURATION})/\text{HOLD\_DURATION}\big)\)
-  - Timer runs only while within `SAME_NOTE_THRESHOLD` of the target.
-  - Perfect at `HOLD_DURATION` ≈ 1.0; longer times reduce score exponentially.
-- Test Mode per-note: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\)
-  - Averages absolute cents over `HOLD_DURATION` within `SAME_NOTE_THRESHOLD`.
-  - Advances even if not within `IN_TUNE_THRESHOLD`.
+- Both modes use: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) per note
+  - Samples collected whenever pitch is within `SAME_NOTE_THRESHOLD` of target.
+  - Samples accumulate across the entire note attempt (persist through pauses/silence).
+  - Average computed from all collected samples when note completes.
+- Practice Mode: Requires continuous in-tune hold to advance; scoring uses all samples from attempts.
+- Test Mode: Auto-advances after accumulated in-range time; scoring uses all samples collected.
 - Final score displayed on success/collapse screens.
 
 ### Hold Duration System
-- Practice: Must maintain in-tune pitch for `HOLD_DURATION` to lock a note (progress bar shows hold).
-- Test: Collect `HOLD_DURATION` of samples while within `SAME_NOTE_THRESHOLD` (progress bar shows sampling window).
-- Timing/sampling pauses if silent or playing outside `SAME_NOTE_THRESHOLD`.
+- Practice: Must maintain continuous in-tune pitch (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION` to lock a note. Progress bar shows hold time; resets if leaving in-tune but samples persist for scoring.
+- Test: Accumulates time while within `SAME_NOTE_THRESHOLD`; auto-advances after `HOLD_DURATION` of accumulated in-range time. Progress bar shows accumulated time; pauses when out-of-range but samples persist.
+- Sample collection: Both modes accumulate cents samples whenever within `SAME_NOTE_THRESHOLD`; samples retained across pauses until note completes.
 
 ### Note Frequencies
 All frequencies follow standard 12-tone equal temperament tuning:

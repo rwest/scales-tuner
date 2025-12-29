@@ -22,19 +22,20 @@ A browser-based violin tuner game built with React and Vite. Play scales into yo
 	- Test: press the blue Test button.
 - Play the displayed note; use the speaker button to hear a reference pitch.
 - Progress bar behavior:
-	- Practice: fills while your pitch is within the in-tune window; locks after the hold duration.
-	- Test: fills while your pitch is within the same-note window; auto-advances after the sampling duration.
+	- Practice: fills while continuously in-tune; resets if you drift out but samples remain for scoring.
+	- Test: fills with accumulated in-range time; pauses when out-of-range but resumes where it left off.
 - Stack a brick for each note; finish the scale to see your score.
 
 ## Modes
 - **Practice Mode**
-	- Timing runs only while you are within the same-note threshold (recognizing the correct target).
-	- Advance when you stay in-tune for the hold duration.
-	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of samples collected while in-range).
+	- Advance when you stay continuously in-tune for the hold duration.
+	- Leaving the in-tune window resets the hold timer but samples persist for scoring.
+	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of all samples collected during note attempt).
 
 - **Test Mode**
-	- Collects pitch samples for the hold duration while within the same-note threshold; auto-advances afterward.
-	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)`.
+	- Accumulates time while within the same-note threshold; pauses timer when out-of-range.
+	- Auto-advances after accumulating the hold duration of in-range time.
+	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of all samples collected).
 
 ### Scoring & thresholds
 - Scores are normalized to 100 total across the whole scale.
