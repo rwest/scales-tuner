@@ -3,9 +3,11 @@ A browser-based violin tuner game built with React and Vite. Play scales into yo
 
 ## Features
 - Live pitch detection via Web Audio API with cents readout and visual pitch meter.
-- Multiple built-in scales (major and melodic minor) across two octaves.
-- Accuracy-based scoring and an instability meter that triggers tower collapse unless you enable the safe mode toggle.
-- Hold-to-lock mechanic: stay within the tuning window briefly to place each brick and move to the next note.
+- Built-in scales including G/Bb/A/D Major, G/A Melodic Minor, and Tonalization 1A.
+- Two gameplay modes: Practice and Test, each with tailored scoring.
+- Music staff display with correct key signature (VexFlow) and proper stem direction.
+- Accuracy-based scoring and instability meter (collapse optional via toggle).
+- Hold/sampling window: place bricks by staying accurate or by completing a sampling window (mode-dependent).
 
 ## Getting started
 1) Install dependencies: `npm install`
@@ -14,10 +16,32 @@ A browser-based violin tuner game built with React and Vite. Play scales into yo
 4) Allow microphone access when prompted; audio input is required for gameplay.
 
 ## How to play
-- Choose a scale and optionally enable "Keep tower from collapsing."
-- Hit Start, then play the displayed note on your instrument.
-- Keep the pitch within the in-tune window until the progress bar fills to drop a brick.
-- Advance through every note of the scale; accuracy earns points and reduces wobble.
+- Choose a scale and optionally enable "Keep tower from collapsing" (applies to both modes).
+- Pick a mode:
+	- Practice: press the green Practice button.
+	- Test: press the blue Test button.
+- Play the displayed note; use the speaker button to hear a reference pitch.
+- Progress bar behavior:
+	- Practice: fills while your pitch is within the in-tune window; locks after the hold duration.
+	- Test: fills while your pitch is within the same-note window; auto-advances after the sampling duration.
+- Stack a brick for each note; finish the scale to see your score.
+
+## Modes
+- **Practice Mode**
+	- Timing runs only while you are within the same-note threshold (recognizing the correct target).
+	- Advance when you stay in-tune for the hold duration.
+	- Per-note score ≈ `exp(-(time_taken − HOLD_DURATION)/HOLD_DURATION)`.
+
+- **Test Mode**
+	- Collects pitch samples for the hold duration while within the same-note threshold; auto-advances afterward.
+	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)`.
+
+### Scoring & thresholds
+- Scores are normalized to 100 total across the whole scale.
+- In-tune window (`IN_TUNE_THRESHOLD`): default 18 cents.
+- Same-note window (`SAME_NOTE_THRESHOLD`): default 50 cents.
+- Hold/sampling duration (`HOLD_DURATION`): default 750 ms.
+- See implementation in [src/violin-tuner-game.tsx](src/violin-tuner-game.tsx).
 
 
 ## React Compiler
