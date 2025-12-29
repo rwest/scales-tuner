@@ -102,7 +102,7 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
   }
 
   const buf2 = buffer.slice(r1, r2);
-  const c = new Array(buf2.length).fill(0);
+  const c: number[] = Array.from({ length: buf2.length }, () => 0);
   
   for (let i = 0; i < buf2.length; i++) {
     for (let j = 0; j < buf2.length - i; j++) {
@@ -125,7 +125,9 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
   
   // Parabolic interpolation
   if (T0 > 0 && T0 < buf2.length - 1) {
-    const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+    const x1: number = c[T0 - 1];
+    const x2: number = c[T0];
+    const x3: number = c[T0 + 1];
     const a = (x1 + x3 - 2 * x2) / 2;
     const b = (x3 - x1) / 2;
     if (a) T0 = T0 - b / (2 * a);
@@ -290,10 +292,11 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 }
 
 // Play a tone with harmonic richness (sounds louder than pure sine wave)
-function playTone(frequency: number, duration: number = 0.5): void {
+async function playTone(frequency: number, duration: number = 0.5): Promise<void> {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    audioContext.resume();
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    await audioContext.resume();
     
     const now = audioContext.currentTime;
     const endTime = now + duration;
@@ -527,7 +530,8 @@ export default function ViolinTunerGame(): ReactNode {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const audioContext = new AudioContextClass();
       await audioContext.resume();
       
       const source = audioContext.createMediaStreamSource(stream);
@@ -565,7 +569,7 @@ export default function ViolinTunerGame(): ReactNode {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      void audioContextRef.current.close();
     }
   }, []);
 
@@ -734,7 +738,7 @@ export default function ViolinTunerGame(): ReactNode {
           <label style={{ color: '#fff', display: 'block', marginBottom: 8 }}>Select Scale:</label>
           <select
             value={selectedScale}
-            onChange={(e) => setSelectedScale(e.target.value)}
+            onChange={(e) => setSelectedScale(e.target.value as ScaleName)}
             style={{
               padding: '12px 24px',
               fontSize: 18,
@@ -763,7 +767,7 @@ export default function ViolinTunerGame(): ReactNode {
         
         <div style={{ display: 'flex', gap: 16 }}>
           <button
-            onClick={() => startGame('practice')}
+            onClick={() => void startGame('practice')}
             style={{
               padding: '16px 48px',
               fontSize: 20,
@@ -779,7 +783,7 @@ export default function ViolinTunerGame(): ReactNode {
             Practice
           </button>
           <button
-            onClick={() => startGame('test')}
+            onClick={() => void startGame('test')}
             style={{
               padding: '16px 48px',
               fontSize: 20,
@@ -848,7 +852,7 @@ export default function ViolinTunerGame(): ReactNode {
                 {currentNote ? formatNoteDisplay(currentNote) : ''}
               </div>
               <button
-                onClick={() => playTone(targetFrequency)}
+                onClick={() => void playTone(targetFrequency)}
                 style={{
                   background: 'none',
                   border: 'none',
