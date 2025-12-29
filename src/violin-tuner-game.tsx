@@ -139,6 +139,12 @@ function getCents(frequency: number, targetFrequency: number): number {
   return 1200 * Math.log2(frequency / targetFrequency);
 }
 
+function averageAbsoluteCents(samples: number[]): number {
+  return samples.length
+    ? samples.reduce((sum, c) => sum + Math.abs(c), 0) / samples.length
+    : 0;
+}
+
 // Map scale names to VexFlow key signatures
 function getKeySignatureForScale(scaleName: ScaleName): string {
   const keyMap: { [key in ScaleName]: string } = {
@@ -497,9 +503,7 @@ export default function ViolinTunerGame(): ReactNode {
   const holdStartRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const noteStartTimeRef = useRef<number | null>(null);
-  const timeInRangeRef = useRef<number>(0);
-  const testSamplesRef = useRef<number[]>([]);
-  const practiceSamplesRef = useRef<number[]>([]);
+  const noteSamplesRef = useRef<number[]>([]);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -538,8 +542,7 @@ export default function ViolinTunerGame(): ReactNode {
       setNoteScores([]);
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
-      timeInRangeRef.current = 0;
-      testSamplesRef.current = [];
+      noteSamplesRef.current = [];
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
       console.error(err);
@@ -561,6 +564,43 @@ export default function ViolinTunerGame(): ReactNode {
 
   useEffect(() => {
     if (!isListening) return;
+
+    const resetNoteTracking = () => {
+      holdStartRef.current = null;
+      noteStartTimeRef.current = null;
+      noteSamplesRef.current = [];
+      setHoldProgress(0);
+    };
+
+    const addNoteResult = (noteScore: number, angle: number) => {
+      const newBrick = { index: bricks.length, angle };
+      const newInstability = instability + Math.abs(angle);
+
+      setBricks(prev => [...prev, newBrick]);
+      setInstability(newInstability);
+      setNoteScores(prev => [...prev, noteScore]);
+
+      const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
+      const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
+      setScore(normalizedScore);
+
+      resetNoteTracking();
+
+      if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
+        setGameState('collapsed');
+        setCollapseTime(Date.now());
+        stopGame();
+        return;
+      }
+
+      if (currentNoteIndex + 1 >= scale.notes.length) {
+        setGameState('success');
+        stopGame();
+        return;
+      }
+
+      setCurrentNoteIndex(prev => prev + 1);
+    };
 
     const detectPitchLoop = () => {
       if (!analyserRef.current || !isListening) return;
@@ -585,7 +625,7 @@ export default function ViolinTunerGame(): ReactNode {
           
           if (gameMode === 'practice') {
             // Practice mode: check if in tune
-            practiceSamplesRef.current.push(cents);
+            noteSamplesRef.current.push(cents);
 
             if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
               if (!holdStartRef.current) {
@@ -596,42 +636,11 @@ export default function ViolinTunerGame(): ReactNode {
               
               if (holdTime >= HOLD_DURATION) {
                 // Note accepted!
-                const avgAbsCents = practiceSamplesRef.current.length
-                  ? practiceSamplesRef.current.reduce((sum, c) => sum + Math.abs(c), 0) / practiceSamplesRef.current.length
-                  : 0;
+                const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
                 const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
                 
                 const angle = cents * 1.5;
-                const newBrick = { index: bricks.length, angle };
-                const newInstability = instability + Math.abs(angle);
-                
-                setBricks(prev => [...prev, newBrick]);
-                setInstability(newInstability);
-                setNoteScores(prev => [...prev, noteScore]);
-                setHoldProgress(0);
-                holdStartRef.current = null;
-                noteStartTimeRef.current = null;
-                practiceSamplesRef.current = [];
-                
-                // Normalize score to 100
-                const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
-                const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
-                setScore(normalizedScore);
-                
-                if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
-                  setGameState('collapsed');
-                  setCollapseTime(Date.now());
-                  stopGame();
-                  return;
-                }
-                
-                if (currentNoteIndex + 1 >= scale.notes.length) {
-                  setGameState('success');
-                  stopGame();
-                  return;
-                }
-                
-                setCurrentNoteIndex(prev => prev + 1);
+                addNoteResult(noteScore, angle);
               }
             } else {
               holdStartRef.current = null;
@@ -640,61 +649,26 @@ export default function ViolinTunerGame(): ReactNode {
           } else {
             // Test mode: collect samples
             const elapsedInRange = Date.now() - noteStartTimeRef.current!;
-            testSamplesRef.current.push(cents);
+            noteSamplesRef.current.push(cents);
             setHoldProgress(Math.min(elapsedInRange / HOLD_DURATION, 1));
             
             if (elapsedInRange >= HOLD_DURATION) {
               // Calculate average error
-              const avgAbsCents = testSamplesRef.current.reduce((sum, c) => sum + Math.abs(c), 0) / testSamplesRef.current.length;
+              const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
               const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
               
-              const angle = avgAbsCents * 1.5 * (testSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
-              const newBrick = { index: bricks.length, angle };
-              const newInstability = instability + Math.abs(angle);
-              
-              setBricks(prev => [...prev, newBrick]);
-              setInstability(newInstability);
-              setNoteScores(prev => [...prev, noteScore]);
-              setHoldProgress(0);
-              noteStartTimeRef.current = null;
-              testSamplesRef.current = [];
-              
-              // Normalize score to 100
-              const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
-              const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
-              setScore(normalizedScore);
-              
-              if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
-                setGameState('collapsed');
-                setCollapseTime(Date.now());
-                stopGame();
-                return;
-              }
-              
-              if (currentNoteIndex + 1 >= scale.notes.length) {
-                setGameState('success');
-                stopGame();
-                return;
-              }
-              
-              setCurrentNoteIndex(prev => prev + 1);
+              const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
+              const angle = avgAbsCents * 1.5 * (bias > 0 ? 1 : -1);
+              addNoteResult(noteScore, angle);
             }
           }
         } else {
           // Outside SAME_NOTE_THRESHOLD - reset
-          holdStartRef.current = null;
-          noteStartTimeRef.current = null;
-          testSamplesRef.current = [];
-          practiceSamplesRef.current = [];
-          setHoldProgress(0);
+          resetNoteTracking();
         }
       } else {
         setCurrentPitch(null);
-        holdStartRef.current = null;
-        noteStartTimeRef.current = null;
-        testSamplesRef.current = [];
-        practiceSamplesRef.current = [];
-        setHoldProgress(0);
+        resetNoteTracking();
       }
 
       animationRef.current = requestAnimationFrame(detectPitchLoop);
