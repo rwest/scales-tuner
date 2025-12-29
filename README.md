@@ -42,7 +42,7 @@ A browser-based violin tuner game built with React and Vite. Play scales into yo
 - In-tune window (`IN_TUNE_THRESHOLD`): default 18 cents.
 - Same-note window (`SAME_NOTE_THRESHOLD`): default 50 cents.
 - Hold/sampling duration (`HOLD_DURATION`): default 750 ms.
-- See implementation in [src/violin-tuner-game.tsx](src/violin-tuner-game.tsx).
+- See implementation in [src/scales-tuner.tsx](src/scales-tuner.tsx).
 
 
 ## React Compiler

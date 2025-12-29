@@ -24,7 +24,7 @@ Welcome to the **Scale Tuner** project! This document provides a comprehensive o
 scale-tuner/
 ├── public/                          # Static assets
 ├── src/
-│   ├── violin-tuner-game.tsx       # Main game component
+│   ├── scales-tuner.tsx            # Main game component
 │   ├── App.jsx                     # React app wrapper
 │   ├── main.jsx                    # React entry point
 │   ├── App.css                     # App styling
@@ -58,7 +58,7 @@ scale-tuner/
 
 ## 📄 Key Files Explained
 
-### [src/violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+### [src/scales-tuner.tsx](src/scales-tuner.tsx)
 The heart of the application. This 967-line component contains:
 
 #### **Type Definitions** (top of file)
@@ -236,8 +236,8 @@ npm run dev
 Opens dev server at `http://localhost:5173` (or similar)
 
 ### Making Changes
-1. **UI/Layout Changes**: Edit JSX in [violin-tuner-game.tsx](src/violin-tuner-game.tsx) (most styling is inline)
-2. **Game Logic**: Edit state management and hooks in [violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+1. **UI/Layout Changes**: Edit JSX in [scales-tuner.tsx](src/scales-tuner.tsx) (most styling is inline)
+2. **Game Logic**: Edit state management and hooks in [scales-tuner.tsx](src/scales-tuner.tsx)
 3. **Audio Algorithm**: Modify `autoCorrelate()` function for pitch detection
 4. **Scales/Notes**: Update `SCALES` or `NOTE_FREQUENCIES` constants
 5. **Key Signatures**: Update `KEY_SIGNATURE_ACCIDENTALS` and `getKeySignatureForScale()` function
@@ -278,25 +278,25 @@ npm run preview
 ## 📝 Common Tasks
 
 ### Adding a New Scale
-1. Add note sequence to `SCALES` constant in [violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+1. Add note sequence to `SCALES` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 2. Add key signature mapping in `getKeySignatureForScale()` function
 3. Ensure all notes exist in `NOTE_FREQUENCIES`
 4. Add any new accidentals to `KEY_SIGNATURE_ACCIDENTALS` if needed
 5. Restart dev server to see in scale selector
 
 ### Adjusting In-Tune Window
-Search for `IN_TUNE_THRESHOLD` constant in [violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+Search for `IN_TUNE_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 - Default: 18 cents
 - Smaller = stricter tuning requirement
 - Larger = more forgiving
 
 ### Changing Hold Duration
-Search for `HOLD_DURATION` constant in [violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+Search for `HOLD_DURATION` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 - Default: 750ms
 - Controls how long player must maintain in-tune pitch
 
 ### Changing Tower Collapse Behavior
-Look for `COLLAPSE_THRESHOLD` constant in [violin-tuner-game.tsx](src/violin-tuner-game.tsx)
+Look for `COLLAPSE_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 - Default: 120 instability points
 - Higher = more forgiving (tower can handle more error)
 - Lower = stricter (tower collapses sooner)

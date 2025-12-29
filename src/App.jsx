@@ -1,5 +1,5 @@
 import './App.css'
-import ViolinTunerGame from './violin-tuner-game'
+import ViolinTunerGame from './scales-tuner'
 
 function App() {
   return (
