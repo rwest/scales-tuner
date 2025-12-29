@@ -75,6 +75,9 @@ const SCALES: ScalesType = {
   'D Major': {
     notes: ['D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C#5', 'D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C#6', 'D6'],
   },
+  'Tonalization 1A': {
+    notes: ['G4', 'B4', 'D5', 'G5', 'A5', 'B5', 'A5', 'G5', 'D5', 'E5', 'D5', 'B4', 'G4'],
+  },
 };
 
 // Autocorrelation pitch detection
@@ -144,6 +147,7 @@ function getKeySignatureForScale(scaleName: ScaleName): string {
     'A Major': 'A',
     'A Minor Melodic': 'C', // A Melodic Minor has no key signature accidentals
     'D Major': 'D',
+    'Tonalization 1A': 'G',
   };
   return keyMap[scaleName];
 }
