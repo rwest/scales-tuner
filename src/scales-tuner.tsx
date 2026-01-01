@@ -89,7 +89,7 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
     rms += buffer[i] * buffer[i];
   }
   rms = Math.sqrt(rms / SIZE);
-  
+
   if (rms < 0.01) return -1; // Not enough signal
 
   let r1 = 0, r2 = SIZE - 1;
@@ -103,7 +103,7 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
 
   const buf2 = buffer.slice(r1, r2);
   const c: number[] = Array.from({ length: buf2.length }, () => 0);
-  
+
   for (let i = 0; i < buf2.length; i++) {
     for (let j = 0; j < buf2.length - i; j++) {
       c[i] += buf2[j] * buf2[j + i];
@@ -112,7 +112,7 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
 
   let d = 0;
   while (c[d] > c[d + 1]) d++;
-  
+
   let maxval = -1, maxpos = -1;
   for (let i = d; i < buf2.length; i++) {
     if (c[i] > maxval) {
@@ -122,7 +122,7 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
   }
 
   let T0 = maxpos;
-  
+
   // Parabolic interpolation
   if (T0 > 0 && T0 < buf2.length - 1) {
     const x1: number = c[T0 - 1];
@@ -213,7 +213,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       renderer.resize(150, 150);
       const context = renderer.getContext();
       context.setFont('Arial', 10);
-      
+
       // Set colors to white
       context.setStrokeStyle('white');
       context.setFillStyle('white');
@@ -241,7 +241,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
         duration: 'h',
         stem_direction: shouldStemDown ? -1 : 1,
       });
-      
+
       // Determine if we need to show an accidental (including naturals against key signature)
       const keySigAcc = getKeyAccidental(keySignature, noteLetter);
       const noteAcc: '#' | 'b' | null = accidental === '#' ? '#' : accidental === 'b' ? 'b' : null;
@@ -258,7 +258,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       if (renderAcc) {
         noteObj.addModifier(new Accidental(renderAcc));
       }
-      
+
       // Set note color to white
       noteObj.setStyle({ fillStyle: 'white', strokeStyle: 'white' });
       noteObj.setLedgerLineStyle({ strokeStyle: '#d1d5db' }); // Pale grey for ledger lines
@@ -297,10 +297,10 @@ async function playTone(frequency: number, duration: number = 0.5): Promise<void
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const audioContext = new AudioContextClass();
     await audioContext.resume();
-    
+
     const now = audioContext.currentTime;
     const endTime = now + duration;
-    
+
     // Create multiple oscillators with different frequencies (harmonics) for richer sound
     const harmonics = [
       { frequency: frequency, volume: 0.3 },           // Fundamental
@@ -308,27 +308,24 @@ async function playTone(frequency: number, duration: number = 0.5): Promise<void
       { frequency: frequency * 3.01, volume: 0.1 },       // 3rd harmonic
       { frequency: frequency * 4, volume: 0.08 },      // 4th harmonic
     ];
-    
+
     const masterGain = audioContext.createGain();
     masterGain.connect(audioContext.destination);
-    
+
     // Set envelope (attack, sustain, release)
     masterGain.gain.setValueAtTime(0, now);
     masterGain.gain.linearRampToValueAtTime(0.5, now + 0.05);        // Attack
     masterGain.gain.setValueAtTime(0.5, endTime - 0.1);              // Sustain
     masterGain.gain.linearRampToValueAtTime(0, endTime);             // Release
-    
+
     harmonics.forEach(({ frequency: freq, volume }) => {
       const osc = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      
       osc.frequency.value = freq;
       osc.type = 'triangle'; // Triangle wave for richer harmonics
       gain.gain.setValueAtTime(volume, now);
-      
       osc.connect(gain);
       gain.connect(masterGain);
-      
       osc.start(now);
       osc.stop(endTime);
     });
@@ -342,7 +339,7 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
   const maxCents = 50; // +/- 50 cents range
   const clampedCents = Math.max(-maxCents, Math.min(maxCents, cents));
   const position = 50 - (clampedCents / maxCents) * 50; // 0-100%, inverted (0 = top = sharp)
-  
+
   return (
     <div style={{
       position: 'relative',
@@ -359,7 +356,7 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
         height: '100%',
         background: 'linear-gradient(to bottom, #ef4444 0%, #22e55f 50%, #2a7afbff 100%)',
       }} />
-      
+
       {/* Center line */}
       <div style={{
         position: 'absolute',
@@ -370,7 +367,7 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
         background: 'rgba(255,255,255,0.8)',
         transform: 'translateY(-50%)',
       }} />
-      
+
       {/* Moving circle indicator */}
       <div style={{
         position: 'absolute',
@@ -394,12 +391,12 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
   const width = 60;
   const height = 16;
   const y = index * (height + 2);
-  
+
   // Map angle to color using same gradient as pitch indicator
   // sharp (positive) = red, perfect (0) = green, flat (negative) = blue
   const maxAngle = 50;
   const normalizedAngle = Math.max(-maxAngle, Math.min(maxAngle, angle)) / maxAngle; // -1 to 1
-  
+
   let color;
   if (normalizedAngle > 0) {
     // sharp: interpolate from green to red
@@ -416,7 +413,7 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
     const b = Math.round(95 + (255 - 95) * t);   // #5f to #fb
     color = `rgb(${r}, ${g}, ${b})`;
   }
-  
+
   return (
     <div
       style={{
@@ -441,34 +438,34 @@ function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
 // Falling brick animation
 function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
   const [pos, setPos] = useState<{ x: number; y: number; rotation: number }>({ x: 0, y: 0, rotation: brick.angle });
-  
+
   useEffect(() => {
     const startY = brick.index * 18;
     const direction = brick.angle > 0 ? 1 : -1;
     let frame: number;
-    
+
     const animate = () => {
       const elapsed = (Date.now() - startTime) / 1000;
       const gravity = 400;
       const horizontalSpeed = direction * 50 * Math.abs(brick.angle) / 10;
-      
+
       setPos({
         x: horizontalSpeed * elapsed,
         y: startY - (gravity * elapsed * elapsed),
         rotation: brick.angle + direction * elapsed * 180,
       });
-      
+
       if (elapsed < 2) {
         frame = requestAnimationFrame(animate);
       }
     };
-    
+
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, [brick, startTime]);
-  
+
   if (pos.y < -200) return null;
-  
+
   return (
     <div
       style={{
@@ -504,7 +501,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [noCollapse, setNoCollapse] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
   const [noteScores, setNoteScores] = useState<number[]>([]);
-  
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -529,19 +526,19 @@ export default function ViolinTunerGame(): ReactNode {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      
+
       const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const audioContext = new AudioContextClass();
       await audioContext.resume();
-      
+
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       source.connect(analyser);
-      
+
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
-      
+
       setGameState('playing');
       setCurrentNoteIndex(0);
       setBricks([]);
@@ -626,22 +623,22 @@ export default function ViolinTunerGame(): ReactNode {
 
       const buffer = new Float32Array(analyserRef.current.fftSize);
       analyserRef.current.getFloatTimeDomainData(buffer);
-      
+
       const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
-      
+
       if (pitch > 0 && pitch > 150 && pitch < 1500) {
         setCurrentPitch(pitch);
         const cents = getCents(pitch, targetFrequency);
         setCurrentCents(cents);
-        
+
         const withinSameNote = Math.abs(cents) < SAME_NOTE_THRESHOLD;
-        
+
         if (withinSameNote) {
           // Start timing if not already started
           if (!noteStartTimeRef.current) {
             noteStartTimeRef.current = Date.now();
           }
-          
+
           if (gameMode === 'practice') {
             // Practice mode: check if in tune
             noteSamplesRef.current.push(cents);
@@ -652,12 +649,12 @@ export default function ViolinTunerGame(): ReactNode {
               }
               const holdTime = Date.now() - holdStartRef.current;
               setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
-              
+
               if (holdTime >= HOLD_DURATION) {
                 // Note accepted!
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
                 const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
-                
+
                 const angle = cents * 1.5;
                 addNoteResult(noteScore, angle);
               }
@@ -670,12 +667,12 @@ export default function ViolinTunerGame(): ReactNode {
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
             noteSamplesRef.current.push(cents);
             setHoldProgress(Math.min(elapsedInRange / HOLD_DURATION, 1));
-            
+
             if (elapsedInRange >= HOLD_DURATION) {
               // Calculate average error
               const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
               const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
-              
+
               const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
               const angle = avgAbsCents * 1.5 * (bias > 0 ? 1 : -1);
               addNoteResult(noteScore, angle);
@@ -698,7 +695,7 @@ export default function ViolinTunerGame(): ReactNode {
     };
 
     animationRef.current = requestAnimationFrame(detectPitchLoop);
-    
+
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -733,7 +730,7 @@ export default function ViolinTunerGame(): ReactNode {
           Play each note in tune to stack bricks.<br />
           Sloppy notes make the tower wobbly!
         </p>
-        
+
         <div style={{ marginBottom: 24 }}>
           <label style={{ color: '#fff', display: 'block', marginBottom: 8 }}>Select Scale:</label>
           <select
@@ -764,7 +761,7 @@ export default function ViolinTunerGame(): ReactNode {
           />
           Keep tower from collapsing
         </label>
-        
+
         <div style={{ display: 'flex', gap: 16 }}>
           <button
             onClick={() => void startGame('practice')}
@@ -799,11 +796,11 @@ export default function ViolinTunerGame(): ReactNode {
             Test
           </button>
         </div>
-        
+
         {error && (
           <p style={{ color: '#f87171', marginTop: 16, textAlign: 'center' }}>{error}</p>
         )}
-        
+
         <p style={{ color: '#64748b', marginTop: 32, fontSize: 14 }}>
           Requires microphone access
         </p>
@@ -842,9 +839,9 @@ export default function ViolinTunerGame(): ReactNode {
           alignItems: 'center',
           gap: 16,
         }}>
-        <p style={{ color: '#94a3b8', margin: '4px 0 -32px 0'}}>
-          Note {currentNoteIndex + 1} of {scale.notes.length}
-        </p>
+          <p style={{ color: '#94a3b8', margin: '4px 0 -32px 0' }}>
+            Note {currentNoteIndex + 1} of {scale.notes.length}
+          </p>
           {/* Top row: Note name and stave */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <div style={{ textAlign: 'center' }}>
@@ -885,7 +882,7 @@ export default function ViolinTunerGame(): ReactNode {
             <div style={{ color: tuning.color, fontSize: 18, fontWeight: 'bold' }}>
               {tuning.text}
             </div>
-            
+
             {/* Hold progress bar */}
             <div style={{
               width: 150,
@@ -966,7 +963,7 @@ export default function ViolinTunerGame(): ReactNode {
             background: 'linear-gradient(to top, #4a3728, #5c4333)',
             borderRadius: 4,
           }} />
-          
+
           {/* Bricks */}
           {gameState === 'collapsed' ? (
             bricks.map((brick, i) => (
