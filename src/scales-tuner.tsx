@@ -685,7 +685,9 @@ export default function ViolinTunerGame(): ReactNode {
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
                 const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
 
-                addNoteResult(noteScore, cents);
+                const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
+                const error = avgAbsCents * (bias > 0 ? 1 : -1);
+                addNoteResult(noteScore, error);
               }
             } else {
               holdStartRef.current = null;
