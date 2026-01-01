@@ -450,12 +450,32 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
   useEffect(() => {
     const startY = brick.index * 18;
     const direction = brick.angle > 0 ? 1 : -1;
+    const pauseDuration = 0.4; // seconds to pause before falling
+    const easeInDuration = 0.3; // seconds to ease into the fall
     let frame: number;
 
     const animate = () => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      const gravity = 400;
-      const horizontalSpeed = direction * 50 * Math.abs(brick.angle) / 10;
+      const totalElapsed = (Date.now() - startTime) / 1000;
+      
+      // Pause at the beginning
+      if (totalElapsed < pauseDuration) {
+        setPos({ x: 0, y: startY, rotation: brick.angle });
+        frame = requestAnimationFrame(animate);
+        return;
+      }
+
+      const elapsed = totalElapsed - pauseDuration;
+      
+      // Apply ease-in curve for the first part of the animation
+      let easeFactor = 1;
+      if (elapsed < easeInDuration) {
+        // Cubic ease-in: starts slow, speeds up
+        const t = elapsed / easeInDuration;
+        easeFactor = t * t * t;
+      }
+
+      const gravity = 400 * easeFactor;
+      const horizontalSpeed = direction * 50 * Math.abs(brick.angle) / 10 * easeFactor;
 
       setPos({
         x: horizontalSpeed * elapsed,
@@ -463,7 +483,7 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
         rotation: brick.angle + direction * elapsed * 180,
       });
 
-      if (elapsed < 2) {
+      if (totalElapsed < 2.5) {
         frame = requestAnimationFrame(animate);
       }
     };
