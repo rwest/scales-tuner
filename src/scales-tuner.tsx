@@ -20,7 +20,9 @@ interface ScalesType {
 
 interface Brick {
   index: number;
-  angle: number;
+  error: number;  // cents deviation from target
+  angle: number;  // calculated rotation angle
+  color: string;  // calculated color based on error
 }
 
 interface TuningIndicator {
@@ -35,6 +37,7 @@ interface PitchIndicatorProps {
 interface BrickProps {
   index: number;
   angle: number;
+  color: string;
   isLatest: boolean;
   opacity?: number;
 }
@@ -139,6 +142,33 @@ function autoCorrelate(buffer: Float32Array, sampleRate: number): number {
 // Calculate cents difference between two frequencies
 function getCents(frequency: number, targetFrequency: number): number {
   return 1200 * Math.log2(frequency / targetFrequency);
+}
+
+// Map error (cents) to brick angle
+function getAngleFromError(error: number): number {
+  return error * 1.5;
+}
+
+// Map error (cents) to brick color
+function getColorFromError(error: number): string {
+  const maxError = 50;
+  const normalizedError = Math.max(-maxError, Math.min(maxError, error)) / maxError; // -1 to 1
+
+  if (normalizedError > 0) {
+    // sharp: interpolate from green to red
+    const t = normalizedError; // 0 to 1
+    const r = Math.round(34 + (239 - 34) * t);   // #22 to #ef
+    const g = Math.round(229 - (229 - 68) * t);  // #e5 to #44
+    const b = Math.round(95 - (95 - 68) * t);    // #5f to #44
+    return `rgb(${r}, ${g}, ${b})`;
+  } else {
+    // flat: interpolate from green to blue
+    const t = Math.abs(normalizedError); // 0 to 1
+    const r = Math.round(34 - (34 - 42) * t);    // #22 to #2a
+    const g = Math.round(229 - (229 - 122) * t); // #e5 to #7a
+    const b = Math.round(95 + (255 - 95) * t);   // #5f to #fb
+    return `rgb(${r}, ${g}, ${b})`;
+  }
 }
 
 function averageAbsoluteCents(samples: number[]): number {
@@ -387,32 +417,10 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
 }
 
 // Brick component
-function Brick({ index, angle, isLatest, opacity = 1 }: BrickProps): ReactNode {
+function Brick({ index, angle, isLatest, opacity = 1, color }: BrickProps): ReactNode {
   const width = 60;
   const height = 16;
   const y = index * (height + 2);
-
-  // Map angle to color using same gradient as pitch indicator
-  // sharp (positive) = red, perfect (0) = green, flat (negative) = blue
-  const maxAngle = 50;
-  const normalizedAngle = Math.max(-maxAngle, Math.min(maxAngle, angle)) / maxAngle; // -1 to 1
-
-  let color;
-  if (normalizedAngle > 0) {
-    // sharp: interpolate from green to red
-    const t = normalizedAngle; // 0 to 1
-    const r = Math.round(34 + (239 - 34) * t);   // #22 to #ef
-    const g = Math.round(229 - (229 - 68) * t);  // #e5 to #44
-    const b = Math.round(95 - (95 - 68) * t);    // #5f to #44
-    color = `rgb(${r}, ${g}, ${b})`;
-  } else {
-    // flat: interpolate from green to blue
-    const t = Math.abs(normalizedAngle); // 0 to 1
-    const r = Math.round(34 - (34 - 42) * t);    // #22 to #2a
-    const g = Math.round(229 - (229 - 122) * t); // #e5 to #7a
-    const b = Math.round(95 + (255 - 95) * t);   // #5f to #fb
-    color = `rgb(${r}, ${g}, ${b})`;
-  }
 
   return (
     <div
@@ -474,7 +482,7 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
         left: `calc(50% + ${pos.x}px)`,
         width: 60,
         height: 16,
-        backgroundColor: 'hsl(0, 60%, 45%)',
+        backgroundColor: brick.color,
         border: '2px solid rgba(0,0,0,0.3)',
         borderRadius: 3,
         transform: `translateX(-50%) rotate(${pos.rotation}deg)`,
@@ -588,8 +596,10 @@ export default function ViolinTunerGame(): ReactNode {
       setHoldProgress(0);
     };
 
-    const addNoteResult = (noteScore: number, angle: number) => {
-      const newBrick = { index: bricks.length, angle };
+    const addNoteResult = (noteScore: number, error: number) => {
+      const angle = getAngleFromError(error);
+      const color = getColorFromError(error);
+      const newBrick = { index: bricks.length, error, angle, color };
       const newInstability = instability + Math.abs(angle);
 
       setBricks(prev => [...prev, newBrick]);
@@ -655,8 +665,7 @@ export default function ViolinTunerGame(): ReactNode {
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
                 const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
 
-                const angle = cents * 1.5;
-                addNoteResult(noteScore, angle);
+                addNoteResult(noteScore, cents);
               }
             } else {
               holdStartRef.current = null;
@@ -674,8 +683,8 @@ export default function ViolinTunerGame(): ReactNode {
               const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
 
               const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
-              const angle = avgAbsCents * 1.5 * (bias > 0 ? 1 : -1);
-              addNoteResult(noteScore, angle);
+              const error = avgAbsCents * (bias > 0 ? 1 : -1);
+              addNoteResult(noteScore, error);
             }
           }
         } else {
@@ -975,6 +984,7 @@ export default function ViolinTunerGame(): ReactNode {
                 key={i}
                 index={brick.index}
                 angle={brick.angle}
+                color={brick.color}
                 isLatest={i === bricks.length - 1}
               />
             ))
