@@ -1,6 +1,6 @@
 {
-  "name": "Scale Tuner",
-  "short_name": "Scale Tuner",
+  "name": "Scale Tower",
+  "short_name": "Scale Tower",
   "start_url": "/scales-tuner/",
   "scope": "/scales-tuner/",
   "display": "standalone",
