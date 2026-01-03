@@ -1026,21 +1026,36 @@ export default function ViolinTunerGame(): ReactNode {
           <div style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>
             Final Score: {score}/100
           </div>
-          <button
-            onClick={() => setGameState('menu')}
-            style={{
-              padding: '12px 32px',
-              fontSize: 16,
-              borderRadius: 8,
-              border: 'none',
-              background: '#475569',
-              color: '#fff',
-              cursor: 'pointer',
-              marginTop: 16,
-            }}
-          >
-            Try Again
-          </button>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
+            <button
+              onClick={() => void startGame(gameMode)}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: '#f87171',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => setGameState('menu')}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: '#475569',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Back to Menu
+            </button>
+          </div>
         </div>
       )}
 
@@ -1059,21 +1074,36 @@ export default function ViolinTunerGame(): ReactNode {
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
             Tower stability: {Math.round((1 - instability / COLLAPSE_THRESHOLD) * 100)}%
           </p>
-          <button
-            onClick={() => setGameState('menu')}
-            style={{
-              padding: '12px 32px',
-              fontSize: 16,
-              borderRadius: 8,
-              border: 'none',
-              background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
-              color: '#fff',
-              cursor: 'pointer',
-              marginTop: 16,
-            }}
-          >
-            Play Again
-          </button>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
+            <button
+              onClick={() => void startGame(gameMode)}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Play Again
+            </button>
+            <button
+              onClick={() => setGameState('menu')}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: '#475569',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Back to Menu
+            </button>
+          </div>
         </div>
       )}
 
