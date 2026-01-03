@@ -532,6 +532,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [noteScores, setNoteScores] = useState<number[]>([]);
   const [isPausedBetweenNotes, setIsPausedBetweenNotes] = useState<boolean>(false);
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
+  const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -821,15 +822,26 @@ export default function ViolinTunerGame(): ReactNode {
           </select>
         </div>
 
-        <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
-          <input
-            type="checkbox"
-            checked={noCollapse}
-            onChange={(e) => setNoCollapse(e.target.checked)}
-            style={{ width: 18, height: 18 }}
-          />
-          Keep tower from collapsing
-        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+          <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={noCollapse}
+              onChange={(e) => setNoCollapse(e.target.checked)}
+              style={{ width: 18, height: 18 }}
+            />
+            Keep tower from collapsing
+          </label>
+          <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={hideTunerWhenPlaying}
+              onChange={(e) => setHideTunerWhenPlaying(e.target.checked)}
+              style={{ width: 18, height: 18 }}
+            />
+            Hide tuner when playing
+          </label>
+        </div>
 
         <div style={{ display: 'flex', gap: 16 }}>
           <button
@@ -948,8 +960,8 @@ export default function ViolinTunerGame(): ReactNode {
 
           {/* Bottom row: Tuning feedback and progress */}
           <div style={{ textAlign: 'center', marginTop: '-32px' }}>
-            <div style={{ color: tuning.color, fontSize: 18, fontWeight: 'bold' }}>
-              {tuning.text}
+            <div style={{ color: hideTunerWhenPlaying && !isPausedBetweenNotes ? '#888' : tuning.color, fontSize: 18, fontWeight: 'bold' }}>
+              {hideTunerWhenPlaying && !isPausedBetweenNotes ? 'Play the note...' : tuning.text}
             </div>
 
             {/* Hold progress bar */}
@@ -964,7 +976,7 @@ export default function ViolinTunerGame(): ReactNode {
               <div style={{
                 width: `${holdProgress * 100}%`,
                 height: '100%',
-                background: gameMode === 'test' ? '#ffffff' : '#22e55f',
+                background: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : '#22e55f'),
                 transition: 'width 0.05s linear',
               }} />
             </div>
@@ -1009,8 +1021,8 @@ export default function ViolinTunerGame(): ReactNode {
       }}>
         {/* Pitch indicator - always visible during gameplay */}
         {gameState === 'playing' && (
-          <div style={{ opacity: isPausedBetweenNotes || currentPitch ? 1 : 0.3 }}>
-            <PitchIndicator cents={isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0)} />
+          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0.3 : (isPausedBetweenNotes || currentPitch ? 1 : 0.3) }}>
+            <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0))} />
           </div>
         )}
 
