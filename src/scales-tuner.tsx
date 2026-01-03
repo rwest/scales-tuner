@@ -609,6 +609,12 @@ export default function ViolinTunerGame(): ReactNode {
   useEffect(() => {
     if (!isListening) return;
 
+    // Cancel any orphaned animation frames before starting a new loop
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
     const pauseInRangeTimer = () => {
       if (noteStartTimeRef.current) {
         accumulatedInRangeRef.current += Date.now() - noteStartTimeRef.current;
