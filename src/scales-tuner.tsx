@@ -989,7 +989,7 @@ export default function ViolinTunerGame(): ReactNode {
           overflow: 'hidden',
         }}>
           <div style={{
-            width: `${(1 - instability / COLLAPSE_THRESHOLD) * 100}%`,
+            width: `${Math.max(0, (1 - instability / COLLAPSE_THRESHOLD) * 100)}%`,
             height: '100%',
             background: instability < 50 ? '#22e55f' : instability < 75 ? '#facc15' : '#f87171',
             transition: 'all 0.3s ease',
