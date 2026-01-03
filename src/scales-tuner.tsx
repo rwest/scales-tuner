@@ -4,7 +4,6 @@ import Vex from 'vexflow';
 // Type definitions
 type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
 type GameMode = 'practice' | 'test';
-type ScaleName = keyof typeof SCALES;
 
 interface NoteFrequencies {
   [key: string]: number;
@@ -178,8 +177,8 @@ function averageAbsoluteCents(samples: number[]): number {
 }
 
 // Map scale names to VexFlow key signatures
-function getKeySignatureForScale(scaleName: ScaleName): string {
-  const keyMap: { [key in ScaleName]: string } = {
+function getKeySignatureForScale(scaleName: string): string {
+  const keyMap: { [key: string]: string } = {
     'G Major': 'G',
     'G Minor Melodic': 'Bb', // G Melodic Minor has 2 flats
     'Bb Major': 'Bb',
@@ -516,7 +515,7 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
 export default function ViolinTunerGame(): ReactNode {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('practice');
-  const [selectedScale, setSelectedScale] = useState<ScaleName>('G Major');
+  const [selectedScale, setSelectedScale] = useState<string>('G Major');
   const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(0);
   const [bricks, setBricks] = useState<Brick[]>([]);
   const [instability, setInstability] = useState<number>(0);
@@ -766,7 +765,7 @@ export default function ViolinTunerGame(): ReactNode {
           <label style={{ color: '#fff', display: 'block', marginBottom: 8 }}>Select Scale:</label>
           <select
             value={selectedScale}
-            onChange={(e) => setSelectedScale(e.target.value as ScaleName)}
+            onChange={(e) => setSelectedScale(e.target.value)}
             style={{
               padding: '12px 24px',
               fontSize: 18,
