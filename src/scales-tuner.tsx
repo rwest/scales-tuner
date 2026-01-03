@@ -47,6 +47,15 @@ interface FallingBrickProps {
   startTime: number;
 }
 
+// Game configuration constants
+const GAME_CONFIG = {
+  HOLD_DURATION: 750,           // ms to hold note in tune
+  IN_TUNE_THRESHOLD: 18,        // cents ±window to accept a note
+  SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
+  COLLAPSE_THRESHOLD: 120,      // instability points before tower falls
+  PAUSE_BETWEEN_NOTES: 600,     // ms to pause between notes
+} as const;
+
 // Note frequencies for all scales (2 octaves)
 const NOTE_FREQUENCIES: NoteFrequencies = {
   'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'C4': 261.63, 'D4': 293.66,
@@ -548,12 +557,6 @@ export default function ViolinTunerGame(): ReactNode {
   const currentNote = scale?.notes[currentNoteIndex];
   const targetFrequency = NOTE_FREQUENCIES[currentNote];
 
-  const HOLD_DURATION = 750; // ms to hold note in tune
-  const IN_TUNE_THRESHOLD = 18; // cents
-  const SAME_NOTE_THRESHOLD = 50; // cents - for recognizing correct note
-  const COLLAPSE_THRESHOLD = 120; // instability points
-  const PAUSE_BETWEEN_NOTES = 600; // ms to pause and show average pitch after note accepted
-
   const startGame = async (mode: GameMode) => {
     setError(null);
     setGameMode(mode);
@@ -651,7 +654,7 @@ export default function ViolinTunerGame(): ReactNode {
       const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
       setPauseAverageCents(avgCents);
 
-      if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
+      if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD && !noCollapse) {
         setGameState('collapsed');
         setCollapseTime(Date.now());
         stopGame();
@@ -679,7 +682,7 @@ export default function ViolinTunerGame(): ReactNode {
       // Handle pause between notes
       if (isPausedBetweenNotes && pauseStartTimeRef.current) {
         const pauseElapsed = Date.now() - pauseStartTimeRef.current;
-        if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
+        if (pauseElapsed >= GAME_CONFIG.PAUSE_BETWEEN_NOTES) {
           // Advance to next note
           resetForNextNote();
           setCurrentNoteIndex(prev => prev + 1);
@@ -706,7 +709,7 @@ export default function ViolinTunerGame(): ReactNode {
         const cents = getCents(pitch, targetFrequency);
         setCurrentCents(cents);
 
-        const withinSameNote = Math.abs(cents) < SAME_NOTE_THRESHOLD;
+        const withinSameNote = Math.abs(cents) < GAME_CONFIG.SAME_NOTE_THRESHOLD;
 
         if (withinSameNote) {
           // Start timing if not already started
@@ -718,17 +721,17 @@ export default function ViolinTunerGame(): ReactNode {
             // Practice mode: check if in tune
             noteSamplesRef.current.push(cents);
 
-            if (Math.abs(cents) < IN_TUNE_THRESHOLD) {
+            if (Math.abs(cents) < GAME_CONFIG.IN_TUNE_THRESHOLD) {
               if (!holdStartRef.current) {
                 holdStartRef.current = Date.now();
               }
               const holdTime = Date.now() - holdStartRef.current;
-              setHoldProgress(Math.min(holdTime / HOLD_DURATION, 1));
+              setHoldProgress(Math.min(holdTime / GAME_CONFIG.HOLD_DURATION, 1));
 
-              if (holdTime >= HOLD_DURATION) {
+              if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
                 // Note accepted!
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-                const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
+                const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.IN_TUNE_THRESHOLD);
 
                 const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
                 const error = avgAbsCents * (bias > 0 ? 1 : -1);
@@ -742,12 +745,12 @@ export default function ViolinTunerGame(): ReactNode {
             // Test mode: collect samples
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
             noteSamplesRef.current.push(cents);
-            setHoldProgress(Math.min(elapsedInRange / HOLD_DURATION, 1));
+            setHoldProgress(Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1));
 
-            if (elapsedInRange >= HOLD_DURATION) {
+            if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
               // Calculate average error
               const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-              const noteScore = Math.exp(-avgAbsCents / IN_TUNE_THRESHOLD);
+              const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.IN_TUNE_THRESHOLD);
 
               const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
               const error = avgAbsCents * (bias > 0 ? 1 : -1);
@@ -758,13 +761,13 @@ export default function ViolinTunerGame(): ReactNode {
           // Outside SAME_NOTE_THRESHOLD - pause timers, keep samples
           pauseInRangeTimer();
           holdStartRef.current = null;
-          setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0);
+          setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0);
         }
       } else {
         setCurrentPitch(null);
         pauseInRangeTimer();
         holdStartRef.current = null;
-        setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0);
+        setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0);
       }
 
       animationRef.current = requestAnimationFrame(detectPitchLoop);
@@ -777,11 +780,11 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, PAUSE_BETWEEN_NOTES]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes]);
 
   const getTuningIndicator = (): TuningIndicator => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
-    if (Math.abs(currentCents) < IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#22e55f' };
+    if (Math.abs(currentCents) < GAME_CONFIG.IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#22e55f' };
     if (currentCents > 0) return { text: `Sharp (+${Math.round(currentCents)}¢)`, color: '#f97316' };
     return { text: `Flat (${Math.round(currentCents)}¢)`, color: '#3b82f6' };
   };
@@ -1009,7 +1012,7 @@ export default function ViolinTunerGame(): ReactNode {
           overflow: 'hidden',
         }}>
           <div style={{
-            width: `${Math.max(0, (1 - instability / COLLAPSE_THRESHOLD) * 100)}%`,
+            width: `${Math.max(0, (1 - instability / GAME_CONFIG.COLLAPSE_THRESHOLD) * 100)}%`,
             height: '100%',
             background: instability < 50 ? '#22e55f' : instability < 75 ? '#facc15' : '#f87171',
             transition: 'all 0.3s ease',
@@ -1133,7 +1136,7 @@ export default function ViolinTunerGame(): ReactNode {
             Score: {score}/100
           </div>
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
-            Tower stability: {Math.round((1 - instability / COLLAPSE_THRESHOLD) * 100)}%
+            Tower stability: {Math.round((1 - instability / GAME_CONFIG.COLLAPSE_THRESHOLD) * 100)}%
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
             <button
