@@ -39,6 +39,7 @@ interface BrickProps {
   color: string;
   isLatest: boolean;
   opacity?: number;
+  cumulativeError?: number;
 }
 
 interface FallingBrickProps {
@@ -416,17 +417,18 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
 }
 
 // Brick component
-function Brick({ index, angle, isLatest, opacity = 1, color }: BrickProps): ReactNode {
+function Brick({ index, angle, isLatest, opacity = 1, color, cumulativeError = 0 }: BrickProps): ReactNode {
   const width = 60;
   const height = 16;
   const y = index * (height + 2);
+  const xOffset = cumulativeError * 0.3; // Scale factor for visual effect
 
   return (
     <div
       style={{
         position: 'absolute',
         bottom: y,
-        left: '50%',
+        left: `calc(50% + ${xOffset}px)`,
         width: width,
         height: height,
         backgroundColor: color,
@@ -1037,15 +1039,19 @@ export default function ViolinTunerGame(): ReactNode {
               <FallingBrick key={i} brick={brick} startTime={collapseTime!} />
             ))
           ) : (
-            bricks.map((brick, i) => (
-              <Brick
-                key={i}
-                index={brick.index}
-                angle={brick.angle}
-                color={brick.color}
-                isLatest={i === bricks.length - 1}
-              />
-            ))
+            bricks.map((brick, i) => {
+              const cumulativeError = bricks.slice(0, i).reduce((sum, b) => sum + b.error, 0);
+              return (
+                <Brick
+                  key={i}
+                  index={brick.index}
+                  angle={brick.angle}
+                  color={brick.color}
+                  isLatest={i === bricks.length - 1}
+                  cumulativeError={cumulativeError}
+                />
+              );
+            })
           )}
         </div>
       </div>
