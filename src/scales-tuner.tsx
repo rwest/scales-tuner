@@ -528,6 +528,8 @@ export default function ViolinTunerGame(): ReactNode {
   const [noCollapse, setNoCollapse] = useState<boolean>(false);
   const [score, setScore] = useState<number>(0);
   const [noteScores, setNoteScores] = useState<number[]>([]);
+  const [isPausedBetweenNotes, setIsPausedBetweenNotes] = useState<boolean>(false);
+  const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -537,6 +539,7 @@ export default function ViolinTunerGame(): ReactNode {
   const noteStartTimeRef = useRef<number | null>(null);
   const accumulatedInRangeRef = useRef<number>(0);
   const noteSamplesRef = useRef<number[]>([]);
+  const pauseStartTimeRef = useRef<number | null>(null);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -546,6 +549,7 @@ export default function ViolinTunerGame(): ReactNode {
   const IN_TUNE_THRESHOLD = 18; // cents
   const SAME_NOTE_THRESHOLD = 50; // cents - for recognizing correct note
   const COLLAPSE_THRESHOLD = 120; // instability points
+  const PAUSE_BETWEEN_NOTES = 600; // ms to pause and show average pitch after note accepted
 
   const startGame = async (mode: GameMode) => {
     setError(null);
@@ -574,6 +578,8 @@ export default function ViolinTunerGame(): ReactNode {
       setHoldProgress(0);
       setScore(0);
       setNoteScores([]);
+      setIsPausedBetweenNotes(false);
+      setPauseAverageCents(0);
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
       accumulatedInRangeRef.current = 0;
@@ -613,6 +619,9 @@ export default function ViolinTunerGame(): ReactNode {
       accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
       setHoldProgress(0);
+      setIsPausedBetweenNotes(false);
+      setPauseAverageCents(0);
+      pauseStartTimeRef.current = null;
     };
 
     const addNoteResult = (noteScore: number, error: number) => {
@@ -629,7 +638,9 @@ export default function ViolinTunerGame(): ReactNode {
       const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
       setScore(normalizedScore);
 
-      resetForNextNote();
+      // Calculate average cents for display during pause
+      const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
+      setPauseAverageCents(avgCents);
 
       if (newInstability >= COLLAPSE_THRESHOLD && !noCollapse) {
         setGameState('collapsed');
@@ -644,16 +655,42 @@ export default function ViolinTunerGame(): ReactNode {
         return;
       }
 
-      setCurrentNoteIndex(prev => prev + 1);
+      // Start pause before advancing to next note
+      setIsPausedBetweenNotes(true);
+      pauseStartTimeRef.current = Date.now();
+      holdStartRef.current = null;
+      noteStartTimeRef.current = null;
+      accumulatedInRangeRef.current = 0;
+      noteSamplesRef.current = [];
     };
 
     const detectPitchLoop = () => {
       if (!analyserRef.current || !isListening) return;
 
+      // Handle pause between notes
+      if (isPausedBetweenNotes && pauseStartTimeRef.current) {
+        const pauseElapsed = Date.now() - pauseStartTimeRef.current;
+        if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
+          // Advance to next note
+          resetForNextNote();
+          setCurrentNoteIndex(prev => prev + 1);
+        } else {
+          // Still paused, keep showing pitch indicator with average cents
+          animationRef.current = requestAnimationFrame(detectPitchLoop);
+          return;
+        }
+      }
+
       const buffer = new Float32Array(analyserRef.current.fftSize);
       analyserRef.current.getFloatTimeDomainData(buffer);
 
       const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
+
+      // Skip pitch processing during pause
+      if (isPausedBetweenNotes) {
+        animationRef.current = requestAnimationFrame(detectPitchLoop);
+        return;
+      }
 
       if (pitch > 0 && pitch > 150 && pitch < 1500) {
         setCurrentPitch(pitch);
@@ -731,7 +768,7 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, PAUSE_BETWEEN_NOTES]);
 
   const getTuningIndicator = (): TuningIndicator => {
     if (!currentPitch) return { text: 'Play the note...', color: '#888' };
@@ -970,8 +1007,8 @@ export default function ViolinTunerGame(): ReactNode {
       }}>
         {/* Pitch indicator - always visible during gameplay */}
         {gameState === 'playing' && (
-          <div style={{ opacity: currentPitch ? 1 : 0.3 }}>
-            <PitchIndicator cents={currentPitch ? currentCents : 0} />
+          <div style={{ opacity: isPausedBetweenNotes || currentPitch ? 1 : 0.3 }}>
+            <PitchIndicator cents={isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0)} />
           </div>
         )}
 
