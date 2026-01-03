@@ -2,6 +2,7 @@
   "name": "Scale Tuner",
   "short_name": "Scale Tuner",
   "start_url": "/scales-tuner/",
+  "scope": "/scales-tuner/",
   "display": "standalone",
   "background_color": "#0c0c0c",
   "theme_color": "#0c0c0c",
