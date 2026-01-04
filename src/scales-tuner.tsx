@@ -1105,6 +1105,20 @@ export default function ViolinTunerGame(): ReactNode {
           </div>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
             <button
+              onClick={() => setGameState('menu')}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: '#475569',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+             ← Back to Menu
+            </button>
+            <button
               onClick={() => void startGame(gameMode)}
               style={{
                 padding: '12px 32px',
@@ -1117,20 +1131,6 @@ export default function ViolinTunerGame(): ReactNode {
               }}
             >
               Try Again
-            </button>
-            <button
-              onClick={() => setGameState('menu')}
-              style={{
-                padding: '12px 32px',
-                fontSize: 16,
-                borderRadius: 8,
-                border: 'none',
-                background: '#475569',
-                color: '#fff',
-                cursor: 'pointer',
-              }}
-            >
-              Back to Menu
             </button>
           </div>
         </div>
@@ -1153,6 +1153,20 @@ export default function ViolinTunerGame(): ReactNode {
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
             <button
+              onClick={() => setGameState('menu')}
+              style={{
+                padding: '12px 32px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: 'none',
+                background: '#475569',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+            ← Back to Menu
+            </button>
+            <button
               onClick={() => void startGame(gameMode)}
               style={{
                 padding: '12px 32px',
@@ -1166,20 +1180,6 @@ export default function ViolinTunerGame(): ReactNode {
             >
               Play Again
             </button>
-            <button
-              onClick={() => setGameState('menu')}
-              style={{
-                padding: '12px 32px',
-                fontSize: 16,
-                borderRadius: 8,
-                border: 'none',
-                background: '#475569',
-                color: '#fff',
-                cursor: 'pointer',
-              }}
-            >
-              Back to Menu
-            </button>
           </div>
         </div>
       )}
@@ -1190,8 +1190,8 @@ export default function ViolinTunerGame(): ReactNode {
           onClick={() => { stopGame(); setGameState('menu'); }}
           style={{
             padding: '8px 16px',
-            fontSize: 14,
-            borderRadius: 6,
+            fontSize: 16,
+            borderRadius: 8,
             border: 'none',
             background: 'rgba(255,255,255,0.1)',
             color: '#94a3b8',
