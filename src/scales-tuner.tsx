@@ -921,7 +921,7 @@ export default function ViolinTunerGame(): ReactNode {
       <div style={{ textAlign: 'center', flexShrink: 0 }}>
         <h2 style={{ color: '#fff', margin: 0, fontSize: 24 }}>{formatScaleName(selectedScale)}</h2>
         <div style={{ color: '#22e55f', fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
-          Score: {score}/100
+          Score: {score}
         </div>
       </div>
 
@@ -1100,7 +1100,7 @@ export default function ViolinTunerGame(): ReactNode {
             Made it to note {currentNoteIndex + 1} of {scale.notes.length}
           </p>
           <div style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>
-            Final Score: {score}/100
+            Final Score: {score}
           </div>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
             <button
