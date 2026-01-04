@@ -1024,7 +1024,7 @@ export default function ViolinTunerGame(): ReactNode {
           <div style={{
             width: `${Math.min(100, (instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%`,
             height: '100%',
-            background: instability < (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length * 0.5) ? '#22e55f' : instability < (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length * 0.75) ? '#facc15' : '#f87171',
+            background: getColorFromError(instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length ) * 50),
             transition: 'all 0.3s ease',
           }} />
         </div>
