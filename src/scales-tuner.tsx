@@ -52,7 +52,7 @@ const GAME_CONFIG = {
   HOLD_DURATION: 750,           // ms to hold note in tune
   IN_TUNE_THRESHOLD: 18,        // cents ±window to accept a note
   SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
-  COLLAPSE_THRESHOLD: 120,      // instability points before tower falls
+  COLLAPSE_THRESHOLD: 12,       // instability points per note before tower falls
   PAUSE_BETWEEN_NOTES: 600,     // ms to pause between notes
 } as const;
 
@@ -654,7 +654,7 @@ export default function ViolinTunerGame(): ReactNode {
       const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
       setPauseAverageCents(avgCents);
 
-      if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD && !noCollapse) {
+      if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
         setGameState('collapsed');
         setCollapseTime(Date.now());
         stopGame();
@@ -1011,7 +1011,7 @@ export default function ViolinTunerGame(): ReactNode {
         flexShrink: 0,
       }}>
         <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
-          Tower Stability
+          Tower Instability
         </div>
         <div style={{
           width: '100%',
@@ -1021,9 +1021,9 @@ export default function ViolinTunerGame(): ReactNode {
           overflow: 'hidden',
         }}>
           <div style={{
-            width: `${Math.max(0, (1 - instability / GAME_CONFIG.COLLAPSE_THRESHOLD) * 100)}%`,
+            width: `${Math.min(100, (instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%`,
             height: '100%',
-            background: instability < 50 ? '#22e55f' : instability < 75 ? '#facc15' : '#f87171',
+            background: instability < (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length * 0.5) ? '#22e55f' : instability < (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length * 0.75) ? '#facc15' : '#f87171',
             transition: 'all 0.3s ease',
           }} />
         </div>
@@ -1148,7 +1148,7 @@ export default function ViolinTunerGame(): ReactNode {
             Score: {score}/100
           </div>
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
-            Tower stability: {Math.round((1 - instability / GAME_CONFIG.COLLAPSE_THRESHOLD) * 100)}%
+            Tower stability: {Math.round((1 - instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
             <button
