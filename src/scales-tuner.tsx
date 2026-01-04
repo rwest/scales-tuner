@@ -667,6 +667,8 @@ export default function ViolinTunerGame(): ReactNode {
         return;
       }
 
+      // Advance the display to the next note.
+      setCurrentNoteIndex(prev => prev + 1);
       // Start pause before advancing to next note
       setIsPausedBetweenNotes(true);
       pauseStartTimeRef.current = Date.now();
@@ -685,7 +687,6 @@ export default function ViolinTunerGame(): ReactNode {
         if (pauseElapsed >= GAME_CONFIG.PAUSE_BETWEEN_NOTES) {
           // Advance to next note
           resetForNextNote();
-          setCurrentNoteIndex(prev => prev + 1);
         } else {
           // Still paused, keep showing pitch indicator with average cents
           animationRef.current = requestAnimationFrame(detectPitchLoop);
