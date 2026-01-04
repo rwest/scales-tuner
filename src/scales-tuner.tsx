@@ -902,17 +902,25 @@ export default function ViolinTunerGame(): ReactNode {
   return (
     <div style={{
       minHeight: '100vh',
+      height: '100vh',
+      boxSizing: 'border-box',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: 20,
+      padding: '16px',
+      paddingTop: 'max(16px, calc(16px + env(safe-area-inset-top)))',
+      paddingBottom: 'max(16px, calc(16px + env(safe-area-inset-bottom)))',
+      paddingLeft: 'max(16px, calc(16px + env(safe-area-inset-left)))',
+      paddingRight: 'max(16px, calc(16px + env(safe-area-inset-right)))',
       fontFamily: 'system-ui, sans-serif',
+      gap: 8,
+      overflow: 'hidden',
     }}>
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <h2 style={{ color: '#fff', margin: 0 }}>{formatScaleName(selectedScale)}</h2>
-        <div style={{ color: '#22e55f', fontSize: 24, fontWeight: 'bold', marginTop: 8 }}>
+      <div style={{ textAlign: 'center', flexShrink: 0 }}>
+        <h2 style={{ color: '#fff', margin: 0, fontSize: 24 }}>{formatScaleName(selectedScale)}</h2>
+        <div style={{ color: '#22e55f', fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
           Score: {score}/100
         </div>
       </div>
@@ -922,20 +930,20 @@ export default function ViolinTunerGame(): ReactNode {
         <div style={{
           background: 'rgba(255,255,255,0.1)',
           borderRadius: 16,
-          padding: '8px 32px',
-          marginBottom: 16,
+          padding: '4px 20px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 16,
+          gap: 8,
+          flexShrink: 0,
         }}>
-          <p style={{ color: '#94a3b8', margin: '4px 0 -32px 0' }}>
+          <p style={{ color: '#94a3b8', margin: '0 0 -32px 0', fontSize: 14 }}>
             Note {currentNoteIndex + 1} of {scale.notes.length}
           </p>
           {/* Top row: Note name and stave */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ color: '#fff', fontSize: 48, fontWeight: 'bold', minWidth: 100 }}>
+              <div style={{ color: '#fff', fontSize: 36, fontWeight: 'bold', minWidth: 80 }}>
                 {currentNote ? formatNoteDisplay(currentNote) : ''}
               </div>
               <button
@@ -943,7 +951,7 @@ export default function ViolinTunerGame(): ReactNode {
                 style={{
                   background: 'none',
                   border: 'none',
-                  fontSize: 32,
+                  fontSize: 30,
                   cursor: 'pointer',
                   padding: '8px',
                   marginTop: -12,
@@ -968,7 +976,7 @@ export default function ViolinTunerGame(): ReactNode {
           </div>
 
           {/* Bottom row: Tuning feedback and progress */}
-          <div style={{ textAlign: 'center', marginTop: '-32px' }}>
+          <div style={{ textAlign: 'center', marginTop: '-38px' }}>
             <div style={{ color: hideTunerWhenPlaying && !isPausedBetweenNotes ? '#888' : tuning.color, fontSize: 18, fontWeight: 'bold' }}>
               {hideTunerWhenPlaying && !isPausedBetweenNotes ? 'Play the note...' : tuning.text}
             </div>
@@ -979,7 +987,7 @@ export default function ViolinTunerGame(): ReactNode {
               height: 8,
               background: 'rgba(255,255,255,0.2)',
               borderRadius: 4,
-              marginTop: 12,
+              marginTop: 8,
               overflow: 'hidden',
             }}>
               <div style={{
@@ -989,7 +997,7 @@ export default function ViolinTunerGame(): ReactNode {
                 transition: 'width 0.05s linear',
               }} />
             </div>
-            <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+            <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
               {gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...'}
             </div>
           </div>
@@ -998,8 +1006,9 @@ export default function ViolinTunerGame(): ReactNode {
 
       {/* Instability meter */}
       <div style={{
-        width: 200,
-        marginBottom: 16,
+        width: '100%',
+        maxWidth: 200,
+        flexShrink: 0,
       }}>
         <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
           Tower Stability
@@ -1020,17 +1029,18 @@ export default function ViolinTunerGame(): ReactNode {
         </div>
       </div>
 
-      {/* Pitch indicator and Tower side by side */}
+      {/* Pitch indicator and Tower side by side - flex grow for spacing */}
       <div style={{
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        gap: 24,
-        marginBottom: 16,
+        gap: 16,
+        flex: 1,
+        minHeight: 100,
       }}>
         {/* Pitch indicator - always visible during gameplay */}
         {gameState === 'playing' && (
-          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0.3 : (isPausedBetweenNotes || currentPitch ? 1 : 0.3) }}>
+          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0.3 : (isPausedBetweenNotes || currentPitch ? 1 : 0.3), flexShrink: 1}}>
             <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0))} />
           </div>
         )}
@@ -1038,17 +1048,19 @@ export default function ViolinTunerGame(): ReactNode {
         {/* Tower */}
         <div style={{
           position: 'relative',
-          width: 200,
-          height: 350,
+          width: 140,
+          height: 'auto',
+          maxHeight: 350,
           display: 'flex',
           alignItems: 'flex-end',
           justifyContent: 'center',
+          flexShrink: 1,
         }}>
           {/* Ground */}
           <div style={{
             position: 'absolute',
             bottom: -10,
-            width: 180,
+            width: 120,
             height: 20,
             background: 'linear-gradient(to top, #4a3728, #5c4333)',
             borderRadius: 4,
@@ -1138,7 +1150,7 @@ export default function ViolinTunerGame(): ReactNode {
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
             Tower stability: {Math.round((1 - instability / GAME_CONFIG.COLLAPSE_THRESHOLD) * 100)}%
           </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
             <button
               onClick={() => void startGame(gameMode)}
               style={{
@@ -1183,7 +1195,8 @@ export default function ViolinTunerGame(): ReactNode {
             background: 'rgba(255,255,255,0.1)',
             color: '#94a3b8',
             cursor: 'pointer',
-            marginTop: 24,
+            margin: 8,
+            flexShrink: 0,
           }}
         >
           ← Back to Menu
