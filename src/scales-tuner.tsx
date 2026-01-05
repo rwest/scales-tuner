@@ -792,10 +792,11 @@ export default function ViolinTunerGame(): ReactNode {
   }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes]);
 
   const getTuningIndicator = (): TuningIndicator => {
-    if (!currentPitch) return { text: 'Play the note...', color: '#888' };
-    if (Math.abs(currentCents) < GAME_CONFIG.IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: '#22e55f' };
-    if (currentCents > 0) return { text: `Sharp (+${Math.round(currentCents)}¢)`, color: '#f97316' };
-    return { text: `Flat (${Math.round(currentCents)}¢)`, color: '#3b82f6' };
+    const displayCents = isPausedBetweenNotes ? pauseAverageCents : currentCents;
+    if (!currentPitch && !isPausedBetweenNotes) return { text: 'Play the note...', color: '#888' };
+    if (Math.abs(displayCents) < GAME_CONFIG.IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: getColorFromError(0) };
+    if (displayCents > 0) return { text: `Sharp (+${Math.round(displayCents)}¢)`, color: getColorFromError(displayCents) };
+    return { text: `Flat (${Math.round(displayCents)}¢)`, color: getColorFromError(displayCents) };
   };
 
   const tuning = getTuningIndicator();
