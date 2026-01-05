@@ -1103,11 +1103,13 @@ export default function ViolinTunerGame(): ReactNode {
           <div style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>
             Final Score: {score}
           </div>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
               onClick={() => setGameState('menu')}
               style={{
-                padding: '12px 32px',
+                flex: 1,
+                width: '150px',
+                padding: '12px 24px',
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
@@ -1116,12 +1118,14 @@ export default function ViolinTunerGame(): ReactNode {
                 cursor: 'pointer',
               }}
             >
-             ← Back to Menu
+              ← Menu
             </button>
             <button
               onClick={() => void startGame(gameMode)}
               style={{
-                padding: '12px 32px',
+                flex: 1,
+                width: '150px',
+                padding: '12px 24px',
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
@@ -1146,16 +1150,18 @@ export default function ViolinTunerGame(): ReactNode {
             Completed {selectedScale}
           </p>
           <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
-            Score: {score}/100
+            Score: {score}
           </div>
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
             Tower stability: {Math.round((1 - instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
           </p>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
               onClick={() => setGameState('menu')}
               style={{
-                padding: '12px 32px',
+                flex: 1,
+                width: '150px',
+                padding: '12px 24px',
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
@@ -1164,12 +1170,14 @@ export default function ViolinTunerGame(): ReactNode {
                 cursor: 'pointer',
               }}
             >
-            ← Back to Menu
+              ← Menu
             </button>
             <button
               onClick={() => void startGame(gameMode)}
               style={{
-                padding: '12px 32px',
+                flex: 1,
+                width: '150px',
+                padding: '12px 24px',
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
@@ -1184,24 +1192,42 @@ export default function ViolinTunerGame(): ReactNode {
         </div>
       )}
 
-      {/* Back button during play */}
+      {/* Buttons during play */}
       {gameState === 'playing' && (
-        <button
-          onClick={() => { stopGame(); setGameState('menu'); }}
-          style={{
-            padding: '8px 16px',
-            fontSize: 16,
-            borderRadius: 8,
-            border: 'none',
-            background: 'rgba(255,255,255,0.1)',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            margin: 8,
-            flexShrink: 0,
-          }}
-        >
-          ← Back to Menu
-        </button>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, maxWidth: 300, flexShrink: 0 }}>
+          <button
+            onClick={() => { stopGame(); setGameState('menu'); }}
+            style={{
+              flex: 1,
+              width: '150px',
+              padding: '12px 24px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: '#475569',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Menu
+          </button>
+          <button
+            onClick={() => void startGame(gameMode)}
+            style={{
+              flex: 1,
+              width: '150px',
+              padding: '12px 24px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: '#3b82f6',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Restart
+          </button>
+        </div>
       )}
     </div>
   );
