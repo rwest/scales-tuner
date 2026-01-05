@@ -52,7 +52,7 @@ const GAME_CONFIG = {
   HOLD_DURATION: 750,           // ms to hold note in tune
   IN_TUNE_THRESHOLD: 18,        // cents ±window to accept a note
   SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
-  COLLAPSE_THRESHOLD: 12,       // instability points per note before tower falls
+  COLLAPSE_THRESHOLD: 15,       // instability points per note before tower falls
   PAUSE_BETWEEN_NOTES: 600,     // ms to pause between notes
 } as const;
 
