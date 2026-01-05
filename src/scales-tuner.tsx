@@ -809,10 +809,11 @@ export default function ViolinTunerGame(): ReactNode {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         padding: 20,
         fontFamily: 'system-ui, sans-serif',
       }}>
+        <div style={{ flex: 1 }} />
         <h1 style={{ color: '#fff', fontSize: 32, marginBottom: 8 }}>🎻 Scale Tower</h1>
         <p style={{ color: '#94a3b8', marginBottom: 32, textAlign: 'center' }}>
           Play each note in tune to stack bricks.<br />
@@ -865,7 +866,9 @@ export default function ViolinTunerGame(): ReactNode {
           <button
             onClick={() => void startGame('practice')}
             style={{
-              padding: '16px 48px',
+              flex: 1,
+              width: 160,
+              padding: '16px 24px',
               fontSize: 20,
               fontWeight: 'bold',
               borderRadius: 12,
@@ -881,7 +884,9 @@ export default function ViolinTunerGame(): ReactNode {
           <button
             onClick={() => void startGame('test')}
             style={{
-              padding: '16px 48px',
+              flex: 1,
+              width: 160,
+              padding: '16px 24px',
               fontSize: 20,
               fontWeight: 'bold',
               borderRadius: 12,
@@ -903,6 +908,7 @@ export default function ViolinTunerGame(): ReactNode {
         <p style={{ color: '#64748b', marginTop: 32, fontSize: 14 }}>
           Requires microphone access
         </p>
+        <div style={{ flex: 3 }} />
 
         {isIPhoneNotStandalone() && (
           <div style={{
@@ -910,8 +916,8 @@ export default function ViolinTunerGame(): ReactNode {
             bottom: 20,
             left: 20,
             right: 20,
-            background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
-            padding: '16px 20px',
+            background: 'linear-gradient(135deg, #7594a2ff 0%, #416c74ff 100%)',
+            padding: '12px 20px',
             borderRadius: 12,
             color: '#fff',
             fontSize: 14,
@@ -919,8 +925,10 @@ export default function ViolinTunerGame(): ReactNode {
             boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)',
             maxWidth: 'calc(100% - 40px)',
           }}>
-            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Install for full-screen benefits</div>
-            <div>Tap <span style={{ fontWeight: 'bold' }}>Share</span> then "Add to Home Screen"</div>
+            <div>Install for full-screen benefits!</div>
+            <div>Tap <svg style={{ display: 'inline-block', width: '1.5em', height: '1.5em', verticalAlign: 'middle', marginX: 4 }} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <path fill="currentColor" d="M5.5 23c-0.4 0 -0.75 -0.15 -1.05 -0.45 -0.3 -0.3 -0.45 -0.65 -0.45 -1.05V8.775c0 -0.4 0.15 -0.75 0.45 -1.05 0.3 -0.3 0.65 -0.45 1.05 -0.45h4.225v1.5H5.5V21.5h13V8.775h-4.275v-1.5H18.5c0.4 0 0.75 0.15 1.05 0.45 0.3 0.3 0.45 0.65 0.45 1.05V21.5c0 0.4 -0.15 0.75 -0.45 1.05 -0.3 0.3 -0.65 0.45 -1.05 0.45H5.5Zm5.725 -7.675V3.9l-2.2 2.2 -1.075 -1.075L11.975 1 16 5.025l-1.075 1.075 -2.2 -2.2v11.425h-1.5Z" stroke-width="0.5"></path>
+            </svg> below then "Add to Home Screen"</div>
           </div>
         )}
       </div>
