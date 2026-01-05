@@ -210,6 +210,14 @@ function formatScaleName(name: string): string {
   return name.replace(/([A-G])b\b/g, '$1♭').replace(/#/g, '♯');
 }
 
+// Detect iPhone not in standalone mode (PWA installed to home screen)
+function isIPhoneNotStandalone(): boolean {
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isIPhone = /iphone|ipod/.test(userAgent);
+  const isStandalone = window.navigator.standalone === true;
+  return isIPhone && !isStandalone;
+}
+
 // Key signature accidentals lookup (treble clef)
 const KEY_SIGNATURE_ACCIDENTALS: Record<string, Record<string, '#' | 'b'>> = {
   // Sharps
@@ -895,6 +903,26 @@ export default function ViolinTunerGame(): ReactNode {
         <p style={{ color: '#64748b', marginTop: 32, fontSize: 14 }}>
           Requires microphone access
         </p>
+
+        {isIPhoneNotStandalone() && (
+          <div style={{
+            position: 'fixed',
+            bottom: 20,
+            left: 20,
+            right: 20,
+            background: 'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+            padding: '16px 20px',
+            borderRadius: 12,
+            color: '#fff',
+            fontSize: 14,
+            textAlign: 'center',
+            boxShadow: '0 4px 15px rgba(6, 182, 212, 0.4)',
+            maxWidth: 'calc(100% - 40px)',
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Install for full-screen benefits</div>
+            <div>Tap <span style={{ fontWeight: 'bold' }}>Share</span> then "Add to Home Screen"</div>
+          </div>
+        )}
       </div>
     );
   }
