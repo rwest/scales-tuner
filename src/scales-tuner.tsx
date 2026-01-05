@@ -22,6 +22,7 @@ interface Brick {
   error: number;  // cents deviation from target
   angle: number;  // calculated rotation angle
   color: string;  // calculated color based on error
+  note?: string;  // note name for display
 }
 
 interface TuningIndicator {
@@ -40,6 +41,7 @@ interface BrickProps {
   isLatest: boolean;
   opacity?: number;
   cumulativeError?: number;
+  note?: string;
 }
 
 interface FallingBrickProps {
@@ -434,7 +436,7 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
 }
 
 // Brick component
-function Brick({ index, angle, isLatest, opacity = 1, color, cumulativeError = 0 }: BrickProps): ReactNode {
+function Brick({ index, angle, isLatest, opacity = 1, color, cumulativeError = 0, note }: BrickProps): ReactNode {
   const width = 60;
   const height = 16;
   const y = index * (height + 2);
@@ -456,8 +458,16 @@ function Brick({ index, angle, isLatest, opacity = 1, color, cumulativeError = 0
         transition: isLatest ? 'none' : 'all 0.3s ease',
         boxShadow: isLatest ? '0 0 10px rgba(255,255,255,0.5)' : '1px 2px 3px rgba(0,0,0,0.2)',
         opacity,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 12,
+        color: 'rgba(0, 0, 0, 0.4)',
+        fontWeight: 'bold',
       }}
-    />
+    >
+      {note ? formatNoteDisplay(note) : ''}
+    </div>
   );
 }
 
@@ -525,8 +535,16 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
         borderRadius: 3,
         transform: `translateX(-50%) rotate(${pos.rotation}deg)`,
         opacity: 0.8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 12,
+        color: 'rgba(0, 0, 0, 0.4)',
+        fontWeight: 'bold',
       }}
-    />
+    >
+      {brick.note ? formatNoteDisplay(brick.note) : ''}
+    </div>
   );
 }
 
@@ -647,7 +665,7 @@ export default function ViolinTunerGame(): ReactNode {
     const addNoteResult = (noteScore: number, error: number) => {
       const angle = getAngleFromError(error);
       const color = getColorFromError(error);
-      const newBrick = { index: bricks.length, error, angle, color };
+      const newBrick = { index: bricks.length, error, angle, color, note: currentNote };
       const newInstability = instability + Math.abs(angle);
 
       setBricks(prev => [...prev, newBrick]);
@@ -1123,6 +1141,7 @@ export default function ViolinTunerGame(): ReactNode {
                   color={brick.color}
                   isLatest={i === bricks.length - 1}
                   cumulativeError={cumulativeError}
+                  note={brick.note}
                 />
               );
             })
