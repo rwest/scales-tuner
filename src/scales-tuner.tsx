@@ -1118,7 +1118,7 @@ export default function ViolinTunerGame(): ReactNode {
                 cursor: 'pointer',
               }}
             >
-              ← Menu
+              Menu
             </button>
             <button
               onClick={() => void startGame(gameMode)}
@@ -1170,7 +1170,7 @@ export default function ViolinTunerGame(): ReactNode {
                 cursor: 'pointer',
               }}
             >
-              ← Menu
+              Menu
             </button>
             <button
               onClick={() => void startGame(gameMode)}
@@ -1194,7 +1194,7 @@ export default function ViolinTunerGame(): ReactNode {
 
       {/* Buttons during play */}
       {gameState === 'playing' && (
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8, maxWidth: 300, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300, flexShrink: 0 }}>
           <button
             onClick={() => { stopGame(); setGameState('menu'); }}
             style={{
