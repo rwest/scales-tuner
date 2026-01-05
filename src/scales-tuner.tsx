@@ -938,18 +938,21 @@ export default function ViolinTunerGame(): ReactNode {
   // Game screen (playing, collapsed, or success)
   return (
     <div style={{
-      minHeight: '100vh',
-      height: '100vh',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       boxSizing: 'border-box',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       padding: '16px',
-      paddingTop: 'max(16px, calc(16px + env(safe-area-inset-top)))',
-      paddingBottom: 'max(16px, calc(16px + env(safe-area-inset-bottom)))',
-      paddingLeft: 'max(16px, calc(16px + env(safe-area-inset-left)))',
-      paddingRight: 'max(16px, calc(16px + env(safe-area-inset-right)))',
+      paddingTop: 'max(16px, env(safe-area-inset-top))',
+      paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      paddingLeft: 'max(16px, env(safe-area-inset-left))',
+      paddingRight: 'max(16px, env(safe-area-inset-right))',
       fontFamily: 'system-ui, sans-serif',
       gap: 8,
       overflow: 'hidden',
@@ -1264,9 +1267,6 @@ export default function ViolinTunerGame(): ReactNode {
             Restart
           </button>
         </div>
-      )}
-      {isIPhoneNotStandalone() && (
-        <div style={{ height: 70 }} /> // This div will push content away from the bottom
       )}
     </div>
   );
