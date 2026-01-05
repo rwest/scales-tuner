@@ -1265,6 +1265,9 @@ export default function ViolinTunerGame(): ReactNode {
           </button>
         </div>
       )}
+      {isIPhoneNotStandalone() && (
+        <div style={{ height: 70 }} /> // This div will push content away from the bottom
+      )}
     </div>
   );
 }
