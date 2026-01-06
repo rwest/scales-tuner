@@ -26,7 +26,8 @@ interface Brick {
 }
 
 interface TuningIndicator {
-  text: string;
+  word: string;
+  number: string;
   color: string;
 }
 
@@ -52,7 +53,8 @@ interface FallingBrickProps {
 // Game configuration constants
 const GAME_CONFIG = {
   HOLD_DURATION: 750,           // ms to hold note in tune
-  IN_TUNE_THRESHOLD: 18,        // cents ±window to accept a note
+  OK_THRESHOLD: 18,             // cents ±window to accept a note
+  GOOD_THRESHOLD: 10,           // cents ±window for "Good!" feedback
   SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
   COLLAPSE_THRESHOLD: 15,       // instability points per note before tower falls
   PAUSE_BETWEEN_NOTES: 600,     // ms to pause between notes
@@ -748,7 +750,7 @@ export default function ViolinTunerGame(): ReactNode {
             // Practice mode: check if in tune
             noteSamplesRef.current.push(cents);
 
-            if (Math.abs(cents) < GAME_CONFIG.IN_TUNE_THRESHOLD) {
+            if (Math.abs(cents) < GAME_CONFIG.OK_THRESHOLD) {
               if (!holdStartRef.current) {
                 holdStartRef.current = Date.now();
               }
@@ -758,7 +760,7 @@ export default function ViolinTunerGame(): ReactNode {
               if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
                 // Note accepted!
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-                const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.IN_TUNE_THRESHOLD);
+                const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
 
                 const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
                 const error = avgAbsCents * (bias > 0 ? 1 : -1);
@@ -777,7 +779,7 @@ export default function ViolinTunerGame(): ReactNode {
             if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
               // Calculate average error
               const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-              const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.IN_TUNE_THRESHOLD);
+              const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
 
               const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
               const error = avgAbsCents * (bias > 0 ? 1 : -1);
@@ -811,10 +813,22 @@ export default function ViolinTunerGame(): ReactNode {
 
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : currentCents;
-    if (!currentPitch && !isPausedBetweenNotes) return { text: 'Play the note...', color: '#888' };
-    if (Math.abs(displayCents) < GAME_CONFIG.IN_TUNE_THRESHOLD) return { text: '✓ In Tune!', color: getColorFromError(0) };
-    if (displayCents > 0) return { text: `Sharp (+${Math.round(displayCents)}¢)`, color: getColorFromError(displayCents) };
-    return { text: `Flat (${Math.round(displayCents)}¢)`, color: getColorFromError(displayCents) };
+    const absDisplayCents = Math.abs(displayCents);
+    if (!currentPitch && !isPausedBetweenNotes) return { word: 'Play the note...', number: '', color: '#888' };
+    
+    const sign = displayCents >= 0 ? '+' : '';
+    const centText = `(${sign}${Math.round(displayCents)}¢)`;
+    
+    if (absDisplayCents < GAME_CONFIG.GOOD_THRESHOLD) {
+      return { word: 'Good!', number: centText, color: getColorFromError(0) };
+    }
+    if (absDisplayCents < GAME_CONFIG.OK_THRESHOLD) {
+      return { word: 'OK...', number: centText, color: getColorFromError(displayCents) };
+    }
+    if (displayCents > 0) {
+      return { word: 'Sharp', number: centText, color: getColorFromError(displayCents) };
+    }
+    return { word: 'Flat', number: centText, color: getColorFromError(displayCents) };
   };
 
   const tuning = getTuningIndicator();
@@ -1036,8 +1050,17 @@ export default function ViolinTunerGame(): ReactNode {
 
           {/* Bottom row: Tuning feedback and progress */}
           <div style={{ textAlign: 'center', marginTop: '-38px' }}>
-            <div style={{ color: hideTunerWhenPlaying && !isPausedBetweenNotes ? '#888' : tuning.color, fontSize: 18, fontWeight: 'bold' }}>
-              {hideTunerWhenPlaying && !isPausedBetweenNotes ? 'Play the note...' : tuning.text}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: 150,
+              color: hideTunerWhenPlaying && !isPausedBetweenNotes ? '#888' : tuning.color,
+              fontSize: 18,
+              fontWeight: 'bold',
+            }}>
+              <span>{hideTunerWhenPlaying && !isPausedBetweenNotes ? 'Play the note...' : tuning.word}</span>
+              { !(hideTunerWhenPlaying && !isPausedBetweenNotes) && tuning.number && <span style={{ fontFamily: 'monospace' }}>{tuning.number}</span>}
             </div>
 
             {/* Hold progress bar */}
