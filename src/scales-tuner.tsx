@@ -218,7 +218,7 @@ function formatScaleName(name: string): string {
 function isIPhoneNotStandalone(): boolean {
   const userAgent = navigator.userAgent.toLowerCase();
   const isIPhone = /iphone|ipod/.test(userAgent);
-  const isStandalone = (window.navigator as any).standalone === true;
+  const isStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   return isIPhone && !isStandalone;
 }
 
@@ -809,7 +809,7 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote]);
 
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : currentCents;
