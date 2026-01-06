@@ -218,7 +218,7 @@ function formatScaleName(name: string): string {
 function isIPhoneNotStandalone(): boolean {
   const userAgent = navigator.userAgent.toLowerCase();
   const isIPhone = /iphone|ipod/.test(userAgent);
-  const isStandalone = window.navigator.standalone === true;
+  const isStandalone = (window.navigator as any).standalone === true;
   return isIPhone && !isStandalone;
 }
 
@@ -959,7 +959,7 @@ export default function ViolinTunerGame(): ReactNode {
             maxWidth: 'calc(100% - 40px)',
           }}>
             <div>Install for full-screen benefits!</div>
-            <div>Tap <svg style={{ display: 'inline-block', width: '1.5em', height: '1.5em', verticalAlign: 'middle', marginX: 4 }} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <div>Tap <svg style={{ display: 'inline-block', width: '1.5em', height: '1.5em', verticalAlign: 'middle', marginLeft: 4, marginRight: 4 }} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
   <path fill="currentColor" d="M5.5 23c-0.4 0 -0.75 -0.15 -1.05 -0.45 -0.3 -0.3 -0.45 -0.65 -0.45 -1.05V8.775c0 -0.4 0.15 -0.75 0.45 -1.05 0.3 -0.3 0.65 -0.45 1.05 -0.45h4.225v1.5H5.5V21.5h13V8.775h-4.275v-1.5H18.5c0.4 0 0.75 0.15 1.05 0.45 0.3 0.3 0.45 0.65 0.45 1.05V21.5c0 0.4 -0.15 0.75 -0.45 1.05 -0.3 0.3 -0.65 0.45 -1.05 0.45H5.5Zm5.725 -7.675V3.9l-2.2 2.2 -1.075 -1.075L11.975 1 16 5.025l-1.075 1.075 -2.2 -2.2v11.425h-1.5Z" stroke-width="0.5"></path>
             </svg> then "Add to Home Screen"</div>
           </div>
