@@ -4,7 +4,7 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 
 ## Architecture Overview
 
-**Single-File Design**: The entire game logic lives in [src/scales-tuner.tsx](src/scales-tuner.tsx) (~1100 lines). This is intentional—UI, audio, game state, and rendering are tightly coupled for real-time responsiveness.
+**Single-File Design**: The entire game logic lives in [src/scales-tuner.tsx](src/scales-tuner.tsx) (~1300 lines). This is intentional—UI, audio, game state, and rendering are tightly coupled for real-time responsiveness.
 
 **Tech Stack**:
 - React 19 with TypeScript for type-safe state management
@@ -17,20 +17,22 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 1. Microphone input → autocorrelation pitch detection
 2. Compare detected frequency to target note frequency (in cents, where 100 cents = 1 semitone)
 3. Collect accuracy samples continuously when within `SAME_NOTE_THRESHOLD` (default 50¢)
-4. Practice mode: Advance when continuously in-tune for `HOLD_DURATION` (750ms)
-5. Test mode: Auto-advance after accumulating `HOLD_DURATION` of in-range time
-6. Per-note score: `exp(-avg_abs_cents / IN_TUNE_THRESHOLD)` normalized to 100 total
-7. Each brick's color and angle reflect tuning accuracy; tower collapses if instability > 120 points
+4. Practice mode: Advance when continuously within `OK_THRESHOLD` for `HOLD_DURATION` (750ms)
+5. Test mode: Auto-advance after accumulating `HOLD_DURATION` of in-range time (still within `SAME_NOTE_THRESHOLD`)
+6. Per-note score: `exp(-avg_abs_cents / OK_THRESHOLD)` normalized to 100 total
+7. Each brick's color and angle reflect tuning accuracy; tower collapses when instability ≥ `COLLAPSE_THRESHOLD * noteCount`
 
 ## Key Constants & Tuning Parameters
 
 All in [src/scales-tuner.tsx](src/scales-tuner.tsx):
 
 ```typescript
-const IN_TUNE_THRESHOLD = 18;        // ±cents window to accept a note
+const HOLD_DURATION = 750;           // ms to hold note in tune
+const OK_THRESHOLD = 18;             // ±cents window to accept a note
+const GOOD_THRESHOLD = 10;           // ±cents window for "Good!" feedback
 const SAME_NOTE_THRESHOLD = 50;      // ±cents to recognize same target note
-const HOLD_DURATION = 750;           // milliseconds to lock a note
-const COLLAPSE_THRESHOLD = 120;      // instability points before tower falls
+const COLLAPSE_THRESHOLD = 15;       // instability points per note before tower falls
+const PAUSE_BETWEEN_NOTES = 600;     // ms to pause between notes
 ```
 
 Samples are **collected continuously** when within `SAME_NOTE_THRESHOLD`, persist across pauses/silence, and accumulate until the note completes. This distinction matters for understanding why scores don't reset if you briefly stop playing.
@@ -39,14 +41,15 @@ Samples are **collected continuously** when within `SAME_NOTE_THRESHOLD`, persis
 
 **Pitch Detection**: `autoCorrelate(buffer, sampleRate)` implements autocorrelation with RMS signal threshold (0.01) to reject noise. Returns frequency in Hz or -1 if too quiet.
 
-**Accuracy Calculation**: `getCents(frequency, targetFrequency)` = `1200 * log₂(frequency / targetFrequency)`. Positive = sharp, negative = flat.
+**Accuracy Calculation**: `getCents(frequency, targetFrequency)` = `1200 * log₂(frequency / targetFrequency)`. Positive = sharp, negative = flat. UI feedback uses `GOOD_THRESHOLD` (10¢) and `OK_THRESHOLD` (18¢) bands.
 
 **Brick Behavior**:
 - Angle = `cents × 1.5` (visual indicator of intonation)
 - Color: Green (in-tune) → Red (sharp) or Blue (flat) gradient
 - `getColorFromError()` interpolates RGB based on cents deviation (clamped to ±50¢)
+- Instability sums `abs(angle)` and triggers collapse when it reaches `COLLAPSE_THRESHOLD * noteCount`.
 
-**Scale System**: `SCALES` object defines note sequences (up to 2 octaves). Each scale has a key signature; `getKeySignatureForScale()` maps to VexFlow key signatures ('G', 'Bb', 'A', 'D', 'C').
+**Scale System**: `SCALES` object defines note sequences (up to 2 octaves). Each scale has a key signature; `getKeySignatureForScale()` maps to VexFlow key signatures ('G', 'Bb', 'A', 'D', 'C'). Menu toggles: "Keep tower from collapsing" (safety) and "Hide tuner when playing" (reduces live feedback until pauses).
 
 ## Workflow & Building
 
@@ -82,7 +85,7 @@ npm run preview   # Serve dist/ locally
 2. Add key signature to `getKeySignatureForScale()` map
 3. Ensure notes exist in `NOTE_FREQUENCIES` (add sharps/flats if needed)
 
-**Adjust Tuning Strictness**: Lower `IN_TUNE_THRESHOLD` (now 18¢) for stricter grading.
+**Adjust Tuning Strictness**: Lower `OK_THRESHOLD` (now 18¢) for stricter grading.
 
 **Change Hold Timing**: Modify `HOLD_DURATION` (now 750ms).
 
@@ -138,7 +141,7 @@ Allows users to practice this common violin etude scale.
 ```
 
 ```
-fix: Lower IN_TUNE_THRESHOLD to 15 cents
+fix: Lower OK_THRESHOLD to 15 cents
 
 Reduced from 18¢ to enforce stricter intonation accuracy.
 Users reported too-lenient grading; narrower window aligns

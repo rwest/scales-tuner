@@ -20,7 +20,7 @@ Welcome to the **Scale Tuner** project! This document provides a comprehensive o
 6. Practice: hold in-tune for `HOLD_DURATION` to place a brick. Test: collect `HOLD_DURATION` of samples within `SAME_NOTE_THRESHOLD` and auto-advance.
 7. Each brick's color and rotation reflects tuning accuracy.
 8. Scores accumulate per note (mode-specific formulas) and normalize to a 100-point total.
-9. Tower collapses if instability reaches 120 points (unless collapse disabled).
+9. Tower collapses if instability reaches `COLLAPSE_THRESHOLD * noteCount` (default 15 per note; collapse can be disabled).
 10. Completing all notes in the scale triggers success state with final score.
 
 ## 📁 Project Structure
@@ -67,7 +67,7 @@ scale-tuner/
 ## 📄 Key Files Explained
 
 ### [src/scales-tuner.tsx](src/scales-tuner.tsx)
-The heart of the application. This 967-line component contains:
+The heart of the application. This ~1300-line component contains:
 
 #### **Type Definitions** (top of file)
 - `GameState`: 'menu' | 'playing' | 'collapsed' | 'success'
@@ -80,9 +80,12 @@ The heart of the application. This 967-line component contains:
 - `SCALES`: Predefined scale patterns with note sequences
   - G Major, G Minor Melodic, Bb Major, A Major, A Minor Melodic, D Major, Tonalization 1A
 - `KEY_SIGNATURE_ACCIDENTALS`: Lookup for key signature accidentals in treble clef
-- `IN_TUNE_THRESHOLD`: Cents window to accept a note as in-tune (default 18¢)
+- `OK_THRESHOLD`: Cents window to accept a note as OK (default 18¢)
+- `GOOD_THRESHOLD`: Cents window for the "Good!" feedback band (default 10¢)
 - `SAME_NOTE_THRESHOLD`: Cents window to recognize the same target note for timing/sampling (default 50¢)
 - `HOLD_DURATION`: Milliseconds to collect/hold before advancing (default 750ms)
+- `COLLAPSE_THRESHOLD`: Instability budget per note before tower falls (15 points per note)
+- `PAUSE_BETWEEN_NOTES`: Delay before advancing after a locked note (default 600ms)
 
 #### **Core Functions**
 
@@ -110,15 +113,15 @@ The heart of the application. This 967-line component contains:
 - `playTone()`: Generates reference tone using Web Audio API with multiple harmonics for richer sound
 
 #### **Game Logic**
-- **Accuracy Calculation**: Converts frequency to cents deviation from target note
+- **Accuracy Calculation**: Converts frequency to cents deviation from target note; UI messaging uses `GOOD_THRESHOLD` (10¢) and `OK_THRESHOLD` (18¢) bands.
 - **Sample Collection**: Both modes collect cents samples whenever within `SAME_NOTE_THRESHOLD`; samples persist across pauses/silence until note completion.
 - **Modes**:
-  - **Practice**: Advance when continuously in-tune (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION`. Leaving in-tune resets hold timer but keeps samples.
-    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using all samples collected during the note attempt.
-  - **Test**: Accumulates time while within `SAME_NOTE_THRESHOLD`; pauses timer when out-of-range or silent. Auto-advances after `HOLD_DURATION` of accumulated in-range time (even if not in-tune).
-    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) using all samples collected.
+  - **Practice**: Advance when continuously within `OK_THRESHOLD` for `HOLD_DURATION`. Leaving the OK window resets the hold timer but keeps samples.
+    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{OK\_THRESHOLD}\big)\) using all samples collected during the note attempt.
+  - **Test**: Accumulates time while within `SAME_NOTE_THRESHOLD`; pauses timer when out-of-range or silent. Auto-advances after `HOLD_DURATION` of accumulated in-range time.
+    - Per-note score: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{OK\_THRESHOLD}\big)\) using all samples collected.
 - **Score Normalization**: Sum per-note scores and normalize to a 100-point total across the scale.
-- **Instability System**: Accumulates based on brick angle; collapses at 120 points (unless "Keep tower from collapsing" enabled).
+- **Instability System**: Accumulates based on brick angle; collapses when instability reaches `COLLAPSE_THRESHOLD * noteCount` (unless "Keep tower from collapsing" is enabled).
 - **Color System**: Bricks and pitch indicator use matching gradient (red→green→blue)
   - Sharp notes: Green (#22e55f) → Red (#ef4444)
   - Flat notes: Green (#22e55f) → Blue (#2a7afbff)
@@ -180,23 +183,19 @@ menu → playing → (success | collapsed) → menu
 ### Cents System
 Cents measure pitch deviation: 100 cents = 1 semitone (half-step)
 - Formula: `cents = 1200 * log₂(detectedFreq / targetFreq)`
-- ±18 cents = "in-tune zone" (threshold to accept note)
+- ±18 cents = OK window; ±10 cents = "Good!" band
 - Used for: UI indicator, accuracy scoring, brick angle, instability calculation
 
 ### Scoring System
-- Total: Normalize the sum of per-note scores to 100 points for the entire scale.
-- Both modes use: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{IN\_TUNE\_THRESHOLD}\big)\) per note
-  - Samples collected whenever pitch is within `SAME_NOTE_THRESHOLD` of target.
-  - Samples accumulate across the entire note attempt (persist through pauses/silence).
-  - Average computed from all collected samples when note completes.
-- Practice Mode: Requires continuous in-tune hold to advance; scoring uses all samples from attempts.
-- Test Mode: Auto-advances after accumulated in-range time; scoring uses all samples collected.
-- Final score displayed on success/collapse screens.
+- Normalize the sum of per-note scores to 100 points for the entire scale.
+- Per note: \(\exp\big(\!-\text{avg\_abs\_cents}/\text{OK\_THRESHOLD}\big)\) using all samples collected while within `SAME_NOTE_THRESHOLD` (samples persist through pauses).
+- Practice: Requires continuous OK-range hold to advance; scoring still uses all collected samples.
+- Test: Auto-advances after accumulated in-range time; scoring uses all collected samples.
 
 ### Hold Duration System
-- Practice: Must maintain continuous in-tune pitch (within `IN_TUNE_THRESHOLD`) for `HOLD_DURATION` to lock a note. Progress bar shows hold time; resets if leaving in-tune but samples persist for scoring.
-- Test: Accumulates time while within `SAME_NOTE_THRESHOLD`; auto-advances after `HOLD_DURATION` of accumulated in-range time. Progress bar shows accumulated time; pauses when out-of-range but samples persist.
-- Sample collection: Both modes accumulate cents samples whenever within `SAME_NOTE_THRESHOLD`; samples retained across pauses until note completes.
+- Practice: Stay within `OK_THRESHOLD` for `HOLD_DURATION` to lock a note; leaving the OK window resets the hold bar but keeps samples for scoring.
+- Test: Accumulates time within `SAME_NOTE_THRESHOLD`; auto-advances after `HOLD_DURATION` of in-range time, pausing accumulation when out-of-range.
+- After a note locks, gameplay pauses for `PAUSE_BETWEEN_NOTES` before advancing.
 
 ### Note Frequencies
 All frequencies follow standard 12-tone equal temperament tuning:
@@ -206,14 +205,9 @@ All frequencies follow standard 12-tone equal temperament tuning:
 
 ### Instability Meter
 Accumulates based on brick placement accuracy:
-- Each brick adds `Math.abs(angle)` to instability score
-- Brick angle = cents × 1.5, so more out-of-tune = more instability
-- Maximum instability threshold: 120 points
-- Triggers tower collapse when exceeded (unless "Keep tower from collapsing" is checked)
-- Visual indicator shows remaining stability with color coding:
-  - Green (< 50 instability): Safe
-  - Yellow (50-75 instability): Warning
-  - Red (75+ instability): Danger
+- Each brick adds `Math.abs(angle)` to instability (angle = cents × 1.5).
+- Collapse triggers when instability reaches `COLLAPSE_THRESHOLD * noteCount` (default 15 per note); can be disabled with "Keep tower from collapsing".
+- Visual indicator uses a green→red gradient based on the percentage of the budget used.
 
 ### Brick Tower
 Visual representation of performance:
@@ -252,7 +246,7 @@ Opens dev server at `http://localhost:5173` (or similar)
 6. **Visual Tuning**: Adjust `PitchIndicator` or `Brick` color calculations
 7. **Music Notation**: Modify `StaveNoteDisplay` component (uses VexFlow API)
 
-8. **Modes & Scoring**: Tweak `IN_TUNE_THRESHOLD`, `SAME_NOTE_THRESHOLD`, `HOLD_DURATION`, and scoring formulas in the pitch loop.
+8. **Modes & Scoring**: Tweak `OK_THRESHOLD`, `SAME_NOTE_THRESHOLD`, `HOLD_DURATION`, and scoring formulas in the pitch loop.
 
 ### Testing Changes
 - Use `npm run dev` for hot-reload testing
@@ -292,8 +286,8 @@ npm run preview
 4. Add any new accidentals to `KEY_SIGNATURE_ACCIDENTALS` if needed
 5. Restart dev server to see in scale selector
 
-### Adjusting In-Tune Window
-Search for `IN_TUNE_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
+### Adjusting OK Window
+Search for `OK_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 - Default: 18 cents
 - Smaller = stricter tuning requirement
 - Larger = more forgiving
@@ -301,19 +295,18 @@ Search for `IN_TUNE_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.t
 ### Changing Hold Duration
 Search for `HOLD_DURATION` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
 - Default: 750ms
-- Controls how long player must maintain in-tune pitch
+- Controls how long the player must stay within the OK window to lock a note
 
 ### Changing Tower Collapse Behavior
 Look for `COLLAPSE_THRESHOLD` constant in [scales-tuner.tsx](src/scales-tuner.tsx)
-- Default: 120 instability points
+- Default: 15 instability points per note (total budget = threshold × note count)
 - Higher = more forgiving (tower can handle more error)
 - Lower = stricter (tower collapses sooner)
 
 ### Modifying Accuracy Scoring
-Search for score calculation in the `detectPitchLoop` function.
-- Practice: `exp(-(time_taken - HOLD_DURATION)/HOLD_DURATION)`
-- Test: `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)`
-- Adjust denominators to make scoring more or less generous.
+Score calculation lives in the pitch loop.
+- Per note (both modes): `exp(-avg_abs_cents / OK_THRESHOLD)` using all collected samples within `SAME_NOTE_THRESHOLD`.
+- Adjust `OK_THRESHOLD` to make scoring more or less generous.
 
 ### Adjusting Color Scheme
 - **Pitch Indicator gradient**: Edit CSS gradient in `PitchIndicator` component
@@ -328,7 +321,7 @@ Search for score calculation in the `detectPitchLoop` function.
 - **No External UI Library**: Uses HTML/CSS for DOM rendering
 - **Event-Driven**: Audio processing runs each animation frame for responsive feedback
 
-## � Deployment
+## Deployment
 
 The project is automatically deployed to GitHub Pages via GitHub Actions.
 
@@ -361,4 +354,4 @@ git push origin main   # Push triggers automatic deployment
 
 ---
 
-**Last Updated**: December 28, 2025
+**Last Updated**: January 6, 2026

@@ -1,5 +1,5 @@
 # Scale Tower 🎻
-A browser-based violin tuner game built with React and Vite. Play scales into your mic, stack bricks for in-tune notes, and keep the tower from collapsing as instability rises with sloppy intonation.
+A browser-based violin tuner game built with React and Vite. Optimized for iPhone and mobile browsers (add to Home Screen for fullscreen), but also works on desktop. Play scales into your mic, stack bricks for in-tune notes, and keep the tower from collapsing as instability rises with sloppy intonation.
 
 🎮 **[Play the live demo](https://rwest.github.io/scales-tuner/)** | 📦 **[GitHub Repository](https://github.com/rwest/scales-tuner)**
 
@@ -42,24 +42,26 @@ Note: The free ngrok tier works fine for development testing.
 	- Test: press the blue Test button.
 - Play the displayed note; use the speaker button to hear a reference pitch.
 - Progress bar behavior:
-	- Practice: fills while continuously in-tune; resets if you drift out but samples remain for scoring.
-	- Test: fills with accumulated in-range time; pauses when out-of-range but resumes where it left off.
+	- Practice: fills while you stay within the OK window (±18¢); leaving that window resets the bar but samples still count for scoring.
+	- Test: fills with accumulated in-range time (within SAME_NOTE_THRESHOLD, ±50¢); pauses when out-of-range and resumes where it left off.
 - Stack a brick for each note; finish the scale to see your score.
 
 ## Modes
 - **Practice Mode**
-	- Advance when you stay continuously in-tune for the hold duration.
-	- Leaving the in-tune window resets the hold timer but samples persist for scoring.
-	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of all samples collected during note attempt).
+	- Advance when you stay continuously within the OK window (±18¢) for the hold duration.
+	- Leaving the OK window resets the hold timer but samples persist for scoring.
+	- Per-note score ≈ `exp(-avg_abs_cents/OK_THRESHOLD)` (average of all samples collected during note attempt).
 
 - **Test Mode**
-	- Accumulates time while within the same-note threshold; pauses timer when out-of-range.
+	- Accumulates time while within the same-note threshold (±50¢); pauses timer when out-of-range.
 	- Auto-advances after accumulating the hold duration of in-range time.
-	- Per-note score ≈ `exp(-avg_abs_cents/IN_TUNE_THRESHOLD)` (average of all samples collected).
+	- Per-note score ≈ `exp(-avg_abs_cents/OK_THRESHOLD)` (average of all samples collected).
 
 ### Scoring & thresholds
 - Scores are normalized to 100 total across the whole scale.
-- In-tune window (`IN_TUNE_THRESHOLD`): default 18 cents.
+- OK window (`OK_THRESHOLD`): default 18 cents; "Good!" band at ±10 cents.
 - Same-note window (`SAME_NOTE_THRESHOLD`): default 50 cents.
 - Hold/sampling duration (`HOLD_DURATION`): default 750 ms.
+- Pause after a locked note (`PAUSE_BETWEEN_NOTES`): 600 ms.
+- Collapse budget (`COLLAPSE_THRESHOLD`): 15 instability points per note (total scales with note count).
 - See implementation in [src/scales-tuner.tsx](src/scales-tuner.tsx).
