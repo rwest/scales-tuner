@@ -1093,7 +1093,7 @@ export default function ViolinTunerGame(): ReactNode {
         flexShrink: 0,
       }}>
         <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 4, textAlign: 'center' }}>
-          Tower Instability
+          Tower Wobble
         </div>
         <div style={{
           width: '100%',
