@@ -806,12 +806,10 @@ export default function ViolinTunerGame(): ReactNode {
 
         const withinSameNote = Math.abs(cents) < GAME_CONFIG.SAME_NOTE_THRESHOLD;
 
-        // During autoplay, collect samples if user plays along
-        if (isAutoplayMode && withinSameNote) {
+        if (withinSameNote) {
+          // always collect samples when within SAME_NOTE_THRESHOLD
           noteSamplesRef.current.push(cents);
-        }
 
-        if (withinSameNote && !isAutoplayMode) {
           // Start timing if not already started
           if (!noteStartTimeRef.current) {
             noteStartTimeRef.current = Date.now();
@@ -819,7 +817,6 @@ export default function ViolinTunerGame(): ReactNode {
 
           if (gameMode === 'practice') {
             // Practice mode: check if in tune
-            noteSamplesRef.current.push(cents);
 
             if (Math.abs(cents) < GAME_CONFIG.OK_THRESHOLD) {
               if (!holdStartRef.current) {
@@ -845,7 +842,7 @@ export default function ViolinTunerGame(): ReactNode {
           } else {
             // Test mode: collect samples
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
-            noteSamplesRef.current.push(cents);
+
             setHoldProgress(Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1));
 
             if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
