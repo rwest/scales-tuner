@@ -707,6 +707,17 @@ export default function ViolinTunerGame(): ReactNode {
     return false; // not ended
   }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex]);
 
+  // Helper to accept a completed note (shared between practice and test modes)
+  const acceptNote = useCallback(() => {
+    const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
+    const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
+    const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
+    const error = avgAbsCents * (bias > 0 ? 1 : -1);
+    const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
+    setPauseAverageCents(avgCents);
+    return handleAddNote(noteScore, error);
+  }, [handleAddNote]);
+
   // Advance autoplay to the next note
   const advanceAutoplayNote = useCallback((noteError: number) => {
     if (!isAutoplayMode) return;
@@ -826,14 +837,7 @@ export default function ViolinTunerGame(): ReactNode {
               setHoldProgress(Math.min(holdTime / GAME_CONFIG.HOLD_DURATION, 1));
 
               if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
-                // Note accepted!
-                const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-                const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
-                const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
-                const error = avgAbsCents * (bias > 0 ? 1 : -1);
-                const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
-                setPauseAverageCents(avgCents);
-                handleAddNote(noteScore, error);
+                acceptNote();
               }
             } else {
               holdStartRef.current = null;
@@ -846,14 +850,7 @@ export default function ViolinTunerGame(): ReactNode {
             setHoldProgress(Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1));
 
             if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
-              // Calculate average error
-              const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-              const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
-              const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
-              const error = avgAbsCents * (bias > 0 ? 1 : -1);
-              const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
-              setPauseAverageCents(avgCents);
-              handleAddNote(noteScore, error);
+              acceptNote();
             }
           }
         } else if (!isAutoplayMode) {
@@ -882,7 +879,7 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote]);
 
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : (isAutoplayMode && !currentPitch ? 0 : currentCents);
