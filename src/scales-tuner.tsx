@@ -1213,8 +1213,8 @@ export default function ViolinTunerGame(): ReactNode {
       }}>
         {/* Pitch indicator - always visible during gameplay */}
         {gameState === 'playing' && (
-          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 0.3 : (isPausedBetweenNotes || currentPitch || isAutoplayMode ? 1 : 0.3), flexShrink: 1}}>
-            <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch || isAutoplayMode ? currentCents : 0))} />
+          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0.3 : (isPausedBetweenNotes || currentPitch ? 1 : 0.3), flexShrink: 1}}>
+            <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0))} />
           </div>
         )}
 
