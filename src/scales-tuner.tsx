@@ -343,7 +343,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 }
 
 // Play a tone with harmonic richness (sounds louder than pure sine wave)
-async function playTone(frequency: number, duration: number = 0.5): Promise<void> {
+async function playTone(frequency: number, duration: number = GAME_CONFIG.HOLD_DURATION/1000): Promise<void> {
   try {
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const audioContext = new AudioContextClass();
@@ -355,8 +355,8 @@ async function playTone(frequency: number, duration: number = 0.5): Promise<void
     // Create multiple oscillators with different frequencies (harmonics) for richer sound
     const harmonics = [
       { frequency: frequency, volume: 0.3 },           // Fundamental
-      { frequency: frequency * 2.005, volume: 0.15 },      // 2nd harmonic
-      { frequency: frequency * 3.01, volume: 0.1 },       // 3rd harmonic
+      { frequency: frequency * 2.002, volume: 0.15 },      // 2nd harmonic
+      { frequency: frequency * 3.005, volume: 0.1 },       // 3rd harmonic
       { frequency: frequency * 4, volume: 0.08 },      // 4th harmonic
     ];
 
@@ -732,6 +732,7 @@ export default function ViolinTunerGame(): ReactNode {
     // Prepare for next autoplay note
     autoplayNoteStartTimeRef.current = null;
     autoplayTimeoutRef.current = setTimeout(() => {
+      setHoldProgress(0);
       autoplayNoteStartTimeRef.current = Date.now();
       const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
       if (nextTargetFrequency) {
@@ -783,6 +784,7 @@ export default function ViolinTunerGame(): ReactNode {
           advanceAutoplayNote(noteError);
           autoplayNoteStartTimeRef.current = null;
           animationRef.current = requestAnimationFrame(detectPitchLoop);
+          setHoldProgress(0);
           return;
         }
       }
