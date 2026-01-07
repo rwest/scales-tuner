@@ -1150,7 +1150,7 @@ export default function ViolinTunerGame(): ReactNode {
               fontSize: 18,
               fontWeight: 'bold',
             }}>
-              <span>{(hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 'Play the note...' : (isAutoplayMode ? 'Demo Playing...' : tuning.word)}</span>
+              <span>{(hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 'Play the note...' : tuning.word}</span>
               { !((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode)) && tuning.number && <span style={{ fontFamily: 'monospace' }}>{tuning.number}</span>}
             </div>
 
@@ -1372,7 +1372,7 @@ export default function ViolinTunerGame(): ReactNode {
             onClick={() => { stopGame(); setGameState('menu'); }}
             style={{
               flex: 1,
-              width: '150px',
+              width: '100px',
               padding: '12px 24px',
               fontSize: 16,
               borderRadius: 8,
@@ -1388,7 +1388,7 @@ export default function ViolinTunerGame(): ReactNode {
             onClick={() => isAutoplayMode ? stopAutoplay() : void startAutoplay()}
             style={{
               flex: 1,
-              width: '150px',
+              width: '100px',
               padding: '12px 24px',
               fontSize: 16,
               borderRadius: 8,
@@ -1404,7 +1404,7 @@ export default function ViolinTunerGame(): ReactNode {
             onClick={() => void startGame(gameMode)}
             style={{
               flex: 1,
-              width: '150px',
+              width: '100px',
               padding: '12px 24px',
               fontSize: 16,
               borderRadius: 8,
