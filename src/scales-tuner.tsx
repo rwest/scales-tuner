@@ -773,6 +773,7 @@ export default function ViolinTunerGame(): ReactNode {
       // Handle autoplay note completion
       if (isAutoplayMode && autoplayNoteStartTimeRef.current) {
         const autoplayElapsed = Date.now() - autoplayNoteStartTimeRef.current;
+        setHoldProgress(Math.min(autoplayElapsed / GAME_CONFIG.HOLD_DURATION, 1));
         if (autoplayElapsed >= GAME_CONFIG.HOLD_DURATION) {
           // Collect samples during this autoplay note (if user played along)
           const noteError = noteSamplesRef.current.length > 0 
@@ -834,7 +835,9 @@ export default function ViolinTunerGame(): ReactNode {
                 holdStartRef.current = Date.now();
               }
               const holdTime = Date.now() - holdStartRef.current;
-              setHoldProgress(Math.min(holdTime / GAME_CONFIG.HOLD_DURATION, 1));
+              if (!isAutoplayMode) {
+                setHoldProgress(Math.min(holdTime / GAME_CONFIG.HOLD_DURATION, 1));
+              }
 
               if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
                 acceptNote();
@@ -847,8 +850,9 @@ export default function ViolinTunerGame(): ReactNode {
             // Test mode: collect samples
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
 
-            setHoldProgress(Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1));
-
+            if (!isAutoplayMode) {
+               setHoldProgress(Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1));
+            }
             if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
               acceptNote();
             }
