@@ -616,6 +616,7 @@ export default function ViolinTunerGame(): ReactNode {
       setScore(0);
       setNoteScores([]);
       setIsPausedBetweenNotes(false);
+      setIsAutoplayMode(false);
       setPauseAverageCents(0);
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
@@ -662,47 +663,71 @@ export default function ViolinTunerGame(): ReactNode {
     }
   }, []);
 
-  // Advance autoplay to the next note
-  const advanceAutoplayNote = useCallback((noteError: number) => {
-    if (!isAutoplayMode) return;
+  // Shared handler for adding a finished note (used by live and autoplay flows)
+  const handleAddNote = useCallback((noteScore: number, error: number): boolean => {
+    const angle = getAngleFromError(error);
+    const color = getColorFromError(error);
 
-    const angle = getAngleFromError(noteError);
-    const color = getColorFromError(noteError);
-    const newBrick = { index: bricks.length, error: noteError, angle, color, note: currentNote };
+    const newBrick = { index: bricks.length, error, angle, color, note: currentNote };
     const newInstability = instability + Math.abs(angle);
 
     setBricks(prev => [...prev, newBrick]);
     setInstability(newInstability);
-    // Autoplay adds bricks with zero score contribution
-    setNoteScores(prev => [...prev, 0]);
+
+    setNoteScores(prev => {
+      const newScores = [...prev, noteScore];
+      const total = newScores.reduce((a, b) => a + b, 0);
+      const normalizedScore = Math.round((total / scale.notes.length) * 100);
+      setScore(normalizedScore);
+      return newScores;
+    });
 
     if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
       setCollapseTime(Date.now());
-      setIsAutoplayMode(false);
       stopGame();
-      return;
+      return true; // ended
     }
 
     if (currentNoteIndex + 1 >= scale.notes.length) {
       setGameState('success');
-      setIsAutoplayMode(false);
       stopGame();
+      return true; // ended
+    }
+
+    // Advance the display to the next note and enter pause between notes
+    setCurrentNoteIndex(prev => prev + 1);
+    setIsPausedBetweenNotes(true);
+    pauseStartTimeRef.current = Date.now();
+    holdStartRef.current = null;
+    noteStartTimeRef.current = null;
+    accumulatedInRangeRef.current = 0;
+    noteSamplesRef.current = [];
+
+    return false; // not ended
+  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex]);
+
+  // Advance autoplay to the next note
+  const advanceAutoplayNote = useCallback((noteError: number) => {
+    if (!isAutoplayMode) return;
+
+    const nextIndex = currentNoteIndex + 1; // next note to play
+    const ended = handleAddNote(0, noteError);
+    if (ended) {
+      setIsAutoplayMode(false);
       return;
     }
 
-    // Advance to next note after pause
-    setCurrentNoteIndex(prev => prev + 1);
+    // Prepare for next autoplay note
     autoplayNoteStartTimeRef.current = null;
-
     autoplayTimeoutRef.current = setTimeout(() => {
       autoplayNoteStartTimeRef.current = Date.now();
-      const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[currentNoteIndex + 1]];
+      const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
       if (nextTargetFrequency) {
         void playTone(nextTargetFrequency, GAME_CONFIG.HOLD_DURATION / 1000);
       }
     }, GAME_CONFIG.PAUSE_BETWEEN_NOTES);
-  }, [isAutoplayMode, bricks, instability, currentNoteIndex, scale, noCollapse, stopGame, currentNote]);
+  }, [isAutoplayMode, currentNoteIndex, scale, handleAddNote]);
 
   useEffect(() => {
     if (!isListening) return;
@@ -729,48 +754,6 @@ export default function ViolinTunerGame(): ReactNode {
       setIsPausedBetweenNotes(false);
       setPauseAverageCents(0);
       pauseStartTimeRef.current = null;
-    };
-
-    const addNoteResult = (noteScore: number, error: number) => {
-      const angle = getAngleFromError(error);
-      const color = getColorFromError(error);
-      const newBrick = { index: bricks.length, error, angle, color, note: currentNote };
-      const newInstability = instability + Math.abs(angle);
-
-      setBricks(prev => [...prev, newBrick]);
-      setInstability(newInstability);
-      setNoteScores(prev => [...prev, noteScore]);
-
-      const totalScore = [...noteScores, noteScore].reduce((a, b) => a + b, 0);
-      const normalizedScore = Math.round((totalScore / scale.notes.length) * 100);
-      setScore(normalizedScore);
-
-      // Calculate average cents for display during pause
-      const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1);
-      setPauseAverageCents(avgCents);
-
-      if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
-        setGameState('collapsed');
-        setCollapseTime(Date.now());
-        stopGame();
-        return;
-      }
-
-      if (currentNoteIndex + 1 >= scale.notes.length) {
-        setGameState('success');
-        stopGame();
-        return;
-      }
-
-      // Advance the display to the next note.
-      setCurrentNoteIndex(prev => prev + 1);
-      // Start pause before advancing to next note
-      setIsPausedBetweenNotes(true);
-      pauseStartTimeRef.current = Date.now();
-      holdStartRef.current = null;
-      noteStartTimeRef.current = null;
-      accumulatedInRangeRef.current = 0;
-      noteSamplesRef.current = [];
     };
 
     const detectPitchLoop = () => {
@@ -810,13 +793,13 @@ export default function ViolinTunerGame(): ReactNode {
 
       const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
 
-      // Skip pitch processing during pause (but not during autoplay)
+      // Skip pitch processing during pause
       if (isPausedBetweenNotes) {
         animationRef.current = requestAnimationFrame(detectPitchLoop);
         return;
       }
 
-      if (pitch > 0 && pitch > 150 && pitch < 1500) {
+      if (pitch > 150 && pitch < 1500) {
         setCurrentPitch(pitch);
         const cents = getCents(pitch, targetFrequency);
         setCurrentCents(cents);
@@ -849,10 +832,11 @@ export default function ViolinTunerGame(): ReactNode {
                 // Note accepted!
                 const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
                 const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
-
                 const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
                 const error = avgAbsCents * (bias > 0 ? 1 : -1);
-                addNoteResult(noteScore, error);
+                const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
+                setPauseAverageCents(avgCents);
+                handleAddNote(noteScore, error);
               }
             } else {
               holdStartRef.current = null;
@@ -868,10 +852,11 @@ export default function ViolinTunerGame(): ReactNode {
               // Calculate average error
               const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
               const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
-
               const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
               const error = avgAbsCents * (bias > 0 ? 1 : -1);
-              addNoteResult(noteScore, error);
+              const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
+              setPauseAverageCents(avgCents);
+              handleAddNote(noteScore, error);
             }
           }
         } else if (!isAutoplayMode) {
@@ -881,6 +866,7 @@ export default function ViolinTunerGame(): ReactNode {
           setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0);
         }
       } else {
+        // No valid pitch detected
         setCurrentPitch(null);
         if (!isAutoplayMode) {
           pauseInRangeTimer();
@@ -899,7 +885,7 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote]);
 
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : (isAutoplayMode && !currentPitch ? 0 : currentCents);
