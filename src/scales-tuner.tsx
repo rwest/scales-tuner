@@ -570,6 +570,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [isPausedBetweenNotes, setIsPausedBetweenNotes] = useState<boolean>(false);
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
   const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(false);
+  const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -580,6 +581,8 @@ export default function ViolinTunerGame(): ReactNode {
   const accumulatedInRangeRef = useRef<number>(0);
   const noteSamplesRef = useRef<number[]>([]);
   const pauseStartTimeRef = useRef<number | null>(null);
+  const autoplayNoteStartTimeRef = useRef<number | null>(null);
+  const autoplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
@@ -624,8 +627,30 @@ export default function ViolinTunerGame(): ReactNode {
     }
   };
 
+  const startAutoplay = async () => {
+    setIsAutoplayMode(true);
+    autoplayNoteStartTimeRef.current = Date.now();
+    const initialFrequency = targetFrequency;
+    if (initialFrequency) {
+      await playTone(initialFrequency, GAME_CONFIG.HOLD_DURATION / 1000);
+    }
+  };
+
+  const stopAutoplay = () => {
+    setIsAutoplayMode(false);
+    if (autoplayTimeoutRef.current) {
+      clearTimeout(autoplayTimeoutRef.current);
+      autoplayTimeoutRef.current = null;
+    }
+  };
+
   const stopGame = useCallback(() => {
     setIsListening(false);
+    setIsAutoplayMode(false);
+    if (autoplayTimeoutRef.current) {
+      clearTimeout(autoplayTimeoutRef.current);
+      autoplayTimeoutRef.current = null;
+    }
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
@@ -636,6 +661,48 @@ export default function ViolinTunerGame(): ReactNode {
       void audioContextRef.current.close();
     }
   }, []);
+
+  // Advance autoplay to the next note
+  const advanceAutoplayNote = useCallback((noteError: number) => {
+    if (!isAutoplayMode) return;
+
+    const angle = getAngleFromError(noteError);
+    const color = getColorFromError(noteError);
+    const newBrick = { index: bricks.length, error: noteError, angle, color, note: currentNote };
+    const newInstability = instability + Math.abs(angle);
+
+    setBricks(prev => [...prev, newBrick]);
+    setInstability(newInstability);
+    // Autoplay adds bricks with zero score contribution
+    setNoteScores(prev => [...prev, 0]);
+
+    if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
+      setGameState('collapsed');
+      setCollapseTime(Date.now());
+      setIsAutoplayMode(false);
+      stopGame();
+      return;
+    }
+
+    if (currentNoteIndex + 1 >= scale.notes.length) {
+      setGameState('success');
+      setIsAutoplayMode(false);
+      stopGame();
+      return;
+    }
+
+    // Advance to next note after pause
+    setCurrentNoteIndex(prev => prev + 1);
+    autoplayNoteStartTimeRef.current = null;
+
+    autoplayTimeoutRef.current = setTimeout(() => {
+      autoplayNoteStartTimeRef.current = Date.now();
+      const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[currentNoteIndex + 1]];
+      if (nextTargetFrequency) {
+        void playTone(nextTargetFrequency, GAME_CONFIG.HOLD_DURATION / 1000);
+      }
+    }, GAME_CONFIG.PAUSE_BETWEEN_NOTES);
+  }, [isAutoplayMode, bricks, instability, currentNoteIndex, scale, noCollapse, stopGame, currentNote]);
 
   useEffect(() => {
     if (!isListening) return;
@@ -709,6 +776,22 @@ export default function ViolinTunerGame(): ReactNode {
     const detectPitchLoop = () => {
       if (!analyserRef.current || !isListening) return;
 
+      // Handle autoplay note completion
+      if (isAutoplayMode && autoplayNoteStartTimeRef.current) {
+        const autoplayElapsed = Date.now() - autoplayNoteStartTimeRef.current;
+        if (autoplayElapsed >= GAME_CONFIG.HOLD_DURATION) {
+          // Collect samples during this autoplay note (if user played along)
+          const noteError = noteSamplesRef.current.length > 0 
+            ? averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
+            : 0;
+          noteSamplesRef.current = [];
+          advanceAutoplayNote(noteError);
+          autoplayNoteStartTimeRef.current = null;
+          animationRef.current = requestAnimationFrame(detectPitchLoop);
+          return;
+        }
+      }
+
       // Handle pause between notes
       if (isPausedBetweenNotes && pauseStartTimeRef.current) {
         const pauseElapsed = Date.now() - pauseStartTimeRef.current;
@@ -727,7 +810,7 @@ export default function ViolinTunerGame(): ReactNode {
 
       const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
 
-      // Skip pitch processing during pause
+      // Skip pitch processing during pause (but not during autoplay)
       if (isPausedBetweenNotes) {
         animationRef.current = requestAnimationFrame(detectPitchLoop);
         return;
@@ -740,7 +823,12 @@ export default function ViolinTunerGame(): ReactNode {
 
         const withinSameNote = Math.abs(cents) < GAME_CONFIG.SAME_NOTE_THRESHOLD;
 
-        if (withinSameNote) {
+        // During autoplay, collect samples if user plays along
+        if (isAutoplayMode && withinSameNote) {
+          noteSamplesRef.current.push(cents);
+        }
+
+        if (withinSameNote && !isAutoplayMode) {
           // Start timing if not already started
           if (!noteStartTimeRef.current) {
             noteStartTimeRef.current = Date.now();
@@ -786,7 +874,7 @@ export default function ViolinTunerGame(): ReactNode {
               addNoteResult(noteScore, error);
             }
           }
-        } else {
+        } else if (!isAutoplayMode) {
           // Outside SAME_NOTE_THRESHOLD - pause timers, keep samples
           pauseInRangeTimer();
           holdStartRef.current = null;
@@ -794,9 +882,11 @@ export default function ViolinTunerGame(): ReactNode {
         }
       } else {
         setCurrentPitch(null);
-        pauseInRangeTimer();
-        holdStartRef.current = null;
-        setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0);
+        if (!isAutoplayMode) {
+          pauseInRangeTimer();
+          holdStartRef.current = null;
+          setHoldProgress(gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0);
+        }
       }
 
       animationRef.current = requestAnimationFrame(detectPitchLoop);
@@ -809,12 +899,13 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote]);
 
   const getTuningIndicator = (): TuningIndicator => {
-    const displayCents = isPausedBetweenNotes ? pauseAverageCents : currentCents;
+    const displayCents = isPausedBetweenNotes ? pauseAverageCents : (isAutoplayMode && !currentPitch ? 0 : currentCents);
     const absDisplayCents = Math.abs(displayCents);
-    if (!currentPitch && !isPausedBetweenNotes) return { word: 'Play the note...', number: '', color: '#888' };
+    if (!currentPitch && !isPausedBetweenNotes && !isAutoplayMode) return { word: 'Play the note...', number: '', color: '#888' };
+    if (isAutoplayMode && !currentPitch) return { word: 'Good!', number: '(+0¢)', color: getColorFromError(0) };
     
     const sign = displayCents >= 0 ? '+' : '';
     const centText = `(${sign}${Math.round(displayCents)}¢)`;
@@ -1055,12 +1146,12 @@ export default function ViolinTunerGame(): ReactNode {
               alignItems: 'center',
               justifyContent: 'space-between',
               width: 150,
-              color: hideTunerWhenPlaying && !isPausedBetweenNotes ? '#888' : tuning.color,
+              color: (hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#888' : tuning.color,
               fontSize: 18,
               fontWeight: 'bold',
             }}>
-              <span>{hideTunerWhenPlaying && !isPausedBetweenNotes ? 'Play the note...' : tuning.word}</span>
-              { !(hideTunerWhenPlaying && !isPausedBetweenNotes) && tuning.number && <span style={{ fontFamily: 'monospace' }}>{tuning.number}</span>}
+              <span>{(hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 'Play the note...' : (isAutoplayMode ? 'Demo Playing...' : tuning.word)}</span>
+              { !((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode)) && tuning.number && <span style={{ fontFamily: 'monospace' }}>{tuning.number}</span>}
             </div>
 
             {/* Hold progress bar */}
@@ -1075,12 +1166,12 @@ export default function ViolinTunerGame(): ReactNode {
               <div style={{
                 width: `${holdProgress * 100}%`,
                 height: '100%',
-                background: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : '#22e55f'),
+                background: ((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : (isAutoplayMode ? '#a78bfa' : '#22e55f'))),
                 transition: 'width 0.05s linear',
               }} />
             </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
-              {gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...'}
+              {isAutoplayMode ? 'Autoplay...' : (gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...')}
             </div>
           </div>
         </div>
@@ -1122,8 +1213,8 @@ export default function ViolinTunerGame(): ReactNode {
       }}>
         {/* Pitch indicator - always visible during gameplay */}
         {gameState === 'playing' && (
-          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0.3 : (isPausedBetweenNotes || currentPitch ? 1 : 0.3), flexShrink: 1}}>
-            <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch ? currentCents : 0))} />
+          <div style={{ opacity: (hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 0.3 : (isPausedBetweenNotes || currentPitch || isAutoplayMode ? 1 : 0.3), flexShrink: 1}}>
+            <PitchIndicator cents={(hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? 0 : (isPausedBetweenNotes ? pauseAverageCents : (currentPitch || isAutoplayMode ? currentCents : 0))} />
           </div>
         )}
 
@@ -1276,7 +1367,7 @@ export default function ViolinTunerGame(): ReactNode {
 
       {/* Buttons during play */}
       {gameState === 'playing' && (
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 450, flexShrink: 0 }}>
           <button
             onClick={() => { stopGame(); setGameState('menu'); }}
             style={{
@@ -1292,6 +1383,22 @@ export default function ViolinTunerGame(): ReactNode {
             }}
           >
             Menu
+          </button>
+          <button
+            onClick={() => isAutoplayMode ? stopAutoplay() : void startAutoplay()}
+            style={{
+              flex: 1,
+              width: '150px',
+              padding: '12px 24px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: isAutoplayMode ? '#f59e0b' : '#10b981',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            {isAutoplayMode ? 'Pause' : 'Autoplay'}
           </button>
           <button
             onClick={() => void startGame(gameMode)}
