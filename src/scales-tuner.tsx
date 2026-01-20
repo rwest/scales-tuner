@@ -422,15 +422,17 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
       {/* Moving circle indicator */}
       <div style={{
         position: 'absolute',
-        top: `${position}%`,
+        top: '50%',
         left: '50%',
         width: 40,
         height: 40,
         borderRadius: '50%',
         background: 'white',
         border: '3px solid rgba(0,0,0,0.5)',
-        transform: 'translate(-50%, -50%)',
-        transition: 'top 0.1s ease-out',
+        // Use transform for GPU-accelerated animation (smoother than animating 'top')
+        transform: `translate(-50%, calc(-50% + ${(position - 50) * 2}px))`,
+        transition: 'transform 0.2s ease',
+        willChange: 'transform',
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }} />
     </div>
@@ -1207,8 +1209,8 @@ export default function ViolinTunerGame(): ReactNode {
                 height: '100%',
                 background: ((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : (isAutoplayMode ? '#a78bfa' : '#22e55f'))),
                 transition: gameMode === 'practice' && !isAutoplayMode
-                  ? (progressAnimState === 'filling' ? `width ${GAME_CONFIG.HOLD_DURATION}ms linear` : 'width 0.05s linear')
-                  : 'width 0.05s linear',
+                  ? (progressAnimState === 'filling' ? `width ${GAME_CONFIG.HOLD_DURATION}ms linear` : 'width 0.1s linear')
+                  : 'width 0.1s linear',
               }} />
             </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
@@ -1238,7 +1240,7 @@ export default function ViolinTunerGame(): ReactNode {
             width: `${Math.min(100, (instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%`,
             height: '100%',
             background: getColorFromError(instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length ) * 50),
-            transition: 'all 0.3s ease',
+            transition: 'all 0.4s ease',
           }} />
         </div>
       </div>
