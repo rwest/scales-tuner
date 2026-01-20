@@ -571,6 +571,9 @@ export default function ViolinTunerGame(): ReactNode {
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
   const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(false);
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
+  // CSS-driven progress animation state: 'idle' | 'filling' | 'complete'
+  const [progressAnimState, setProgressAnimState] = useState<'idle' | 'filling' | 'complete'>('idle');
+  const progressAnimStartRef = useRef<number | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -778,6 +781,8 @@ export default function ViolinTunerGame(): ReactNode {
       noteSamplesRef.current = [];
       latestHoldProgressRef.current = 0;
       setHoldProgress(0);
+      setProgressAnimState('idle');
+      progressAnimStartRef.current = null;
       setIsPausedBetweenNotes(false);
       setPauseAverageCents(0);
       pauseStartTimeRef.current = null;
@@ -842,6 +847,11 @@ export default function ViolinTunerGame(): ReactNode {
             if (Math.abs(cents) < GAME_CONFIG.OK_THRESHOLD) {
               if (!holdStartRef.current) {
                 holdStartRef.current = Date.now();
+                // Trigger CSS animation start
+                if (!isAutoplayMode) {
+                  progressAnimStartRef.current = Date.now();
+                  setProgressAnimState('filling');
+                }
               }
               const holdTime = Date.now() - holdStartRef.current;
               if (!isAutoplayMode) {
@@ -850,11 +860,17 @@ export default function ViolinTunerGame(): ReactNode {
 
               if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
                 noteAcceptedThisCycle = true;
+                setProgressAnimState('complete');
                 acceptNote();
               }
             } else {
               holdStartRef.current = null;
               latestHoldProgressRef.current = 0;
+              // Reset CSS animation if player goes out of tune
+              if (!isAutoplayMode && progressAnimStartRef.current) {
+                setProgressAnimState('idle');
+                progressAnimStartRef.current = null;
+              }
             }
           } else {
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
@@ -871,13 +887,24 @@ export default function ViolinTunerGame(): ReactNode {
           pauseInRangeTimer();
           holdStartRef.current = null;
           latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0;
+          // Reset CSS animation when outside SAME_NOTE_THRESHOLD
+          if (gameMode === 'practice' && progressAnimStartRef.current) {
+            setProgressAnimState('idle');
+            progressAnimStartRef.current = null;
+          }
         }
       } else {
+        // No valid pitch detected
         latestPitchRef.current = null;
         if (!isAutoplayMode) {
           pauseInRangeTimer();
           holdStartRef.current = null;
           latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0;
+          // Reset CSS animation when no pitch detected
+          if (gameMode === 'practice' && progressAnimStartRef.current) {
+            setProgressAnimState('idle');
+            progressAnimStartRef.current = null;
+          }
         }
       }
     };
@@ -1164,7 +1191,7 @@ export default function ViolinTunerGame(): ReactNode {
               { !((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode)) && tuning.number && <span style={{ fontFamily: 'monospace' }}>{tuning.number}</span>}
             </div>
 
-            {/* Hold progress bar */}
+            {/* Hold progress bar - CSS-animated for smooth 60fps on iOS */}
             <div style={{
               width: 150,
               height: 8,
@@ -1174,10 +1201,14 @@ export default function ViolinTunerGame(): ReactNode {
               overflow: 'hidden',
             }}>
               <div style={{
-                width: `${holdProgress * 100}%`,
+                width: gameMode === 'practice' && !isAutoplayMode
+                  ? (progressAnimState === 'filling' ? '100%' : progressAnimState === 'complete' ? '100%' : '0%')
+                  : `${holdProgress * 100}%`,
                 height: '100%',
                 background: ((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : (isAutoplayMode ? '#a78bfa' : '#22e55f'))),
-                transition: 'width 0.05s linear',
+                transition: gameMode === 'practice' && !isAutoplayMode
+                  ? (progressAnimState === 'filling' ? `width ${GAME_CONFIG.HOLD_DURATION}ms linear` : 'width 0.05s linear')
+                  : 'width 0.05s linear',
               }} />
             </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
