@@ -1073,6 +1073,10 @@ export default function ViolinTunerGame(): ReactNode {
         </p>
         <div style={{ flex: 3 }} />
 
+        <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>
+          {import.meta.env.VITE_BUILD_NUMBER ? `v${import.meta.env.VITE_BUILD_NUMBER}` : 'dev'} • {__BUILD_DATE__}
+        </p>
+
         {isIPhoneNotStandalone() && (
           <div style={{
             position: 'fixed',
