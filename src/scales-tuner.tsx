@@ -1181,7 +1181,7 @@ export default function ViolinTunerGame(): ReactNode {
                 width: `${holdProgress * 100}%`,
                 height: '100%',
                 background: ((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : (isAutoplayMode ? '#a78bfa' : '#22e55f'))),
-                transition: 'width 0.05s linear',
+                transition: 'width 0.05s ease-out',
               }} />
             </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
