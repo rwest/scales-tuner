@@ -422,17 +422,15 @@ function PitchIndicator({ cents }: PitchIndicatorProps): ReactNode {
       {/* Moving circle indicator */}
       <div style={{
         position: 'absolute',
-        top: '50%',
+        top: `${position}%`,
         left: '50%',
         width: 40,
         height: 40,
         borderRadius: '50%',
         background: 'white',
         border: '3px solid rgba(0,0,0,0.5)',
-        // Use transform for GPU-accelerated animation (smoother than animating 'top')
-        transform: `translate(-50%, calc(-50% + ${(position - 50) * 2}px))`,
-        transition: 'transform 0.2s ease',
-        willChange: 'transform',
+        transform: 'translate(-50%, -50%)',
+        transition: 'top 0.05s ease-out',
         boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
       }} />
     </div>
