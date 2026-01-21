@@ -70,10 +70,10 @@ const DEFAULT_SETTINGS: GameSettings = {
 
 // Settings ranges for sliders
 const SETTINGS_RANGES = {
-  okThreshold: { min: 10, max: 30, step: 1 },           // hard (10) to easy (30)
-  collapseThreshold: { min: 8, max: 25, step: 1 },     // hard (8) to easy (25)
-  holdDuration: { min: 400, max: 1200, step: 50 },     // short (400) to long (1200)
-  pauseBetweenNotes: { min: 300, max: 1000, step: 50 }, // short (300) to long (1000)
+  okThreshold: { min: 9, max: 27, step: 1 },           // hard (10) to easy (30)
+  collapseThreshold: { min: 8, max: 22, step: 1 },     // hard (8) to easy (25)
+  holdDuration: { min: 400, max: 1100, step: 50 },     // short (400) to long (1200)
+  pauseBetweenNotes: { min: 300, max: 900, step: 50 }, // short (300) to long (1000)
 } as const;
 
 const STORAGE_KEY = 'scaleTowerSettings';
@@ -1211,7 +1211,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8' }}>±{settings.okThreshold}¢</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ color: '#22e55f', fontSize: 12 }}>Hard</span>
+            <span style={{ color: '#f87171', fontSize: 12 }}>Hard</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
                 type="range"
@@ -1233,7 +1233,7 @@ export default function ViolinTunerGame(): ReactNode {
                 pointerEvents: 'none',
               }} />
             </div>
-            <span style={{ color: '#f87171', fontSize: 12 }}>Easy</span>
+            <span style={{ color: '#22e55f', fontSize: 12 }}>Easy</span>
           </div>
         </div>
 
@@ -1244,7 +1244,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8' }}>{settings.collapseThreshold} pts/note</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ color: '#22e55f', fontSize: 12 }}>Hard</span>
+            <span style={{ color: '#f87171', fontSize: 12 }}>Hard</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
                 type="range"
@@ -1265,7 +1265,7 @@ export default function ViolinTunerGame(): ReactNode {
                 pointerEvents: 'none',
               }} />
             </div>
-            <span style={{ color: '#f87171', fontSize: 12 }}>Easy</span>
+            <span style={{ color: '#22e55f', fontSize: 12 }}>Easy</span>
           </div>
         </div>
 
