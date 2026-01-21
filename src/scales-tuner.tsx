@@ -1067,7 +1067,7 @@ export default function ViolinTunerGame(): ReactNode {
               fontSize: 16,
               borderRadius: 8,
               border: 'none',
-              background: 'transparent',
+              background: '#475569',
               color: '#94a3b8',
               cursor: 'pointer',
               display: 'flex',
