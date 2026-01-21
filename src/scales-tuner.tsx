@@ -1019,28 +1019,28 @@ export default function ViolinTunerGame(): ReactNode {
           Sloppy notes make the tower wobbly!
         </p>
 
-        <div style={{ marginBottom: 24 }}>
-          <label style={{ color: '#fff', display: 'block', marginBottom: 8 }}>Select Scale:</label>
-          <select
-            value={selectedScale}
-            onChange={(e) => setSelectedScale(e.target.value)}
-            style={{
-              padding: '12px 24px',
-              fontSize: 18,
-              borderRadius: 8,
-              border: 'none',
-              background: '#334155',
-              color: '#fff',
-              cursor: 'pointer',
-            }}
-          >
-            {Object.keys(SCALES).filter(name => settings.enabledScales.includes(name)).map(name => (
-              <option key={name} value={name}>{formatScaleName(name)}</option>
-            ))}
-          </select>
-        </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+          <div>
+            <label style={{ color: '#fff', display: 'block', marginBottom: 8 }}>Select Scale:</label>
+            <select
+              value={selectedScale}
+              onChange={(e) => setSelectedScale(e.target.value)}
+              style={{
+                padding: '12px 24px',
+                fontSize: 18,
+                borderRadius: 8,
+                border: 'none',
+                background: '#334155',
+                color: '#fff',
+                cursor: 'pointer',
+                width: '100%',
+              }}
+            >
+              {Object.keys(SCALES).filter(name => settings.enabledScales.includes(name)).map(name => (
+                <option key={name} value={name}>{formatScaleName(name)}</option>
+              ))}
+            </select>
+          </div>
           <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
               type="checkbox"
@@ -1068,10 +1068,11 @@ export default function ViolinTunerGame(): ReactNode {
               borderRadius: 8,
               border: 'none',
               background: '#334155',
-              color: '#cbd5e1',
+              color: '#fff',
               cursor: 'pointer',
               alignItems: 'center',
               justifyContent: 'center',
+              width: '100%',
             }}
           >
             <span style={{ fontSize: 20 }}>⚙️</span> Settings
