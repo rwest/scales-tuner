@@ -1203,6 +1203,41 @@ export default function ViolinTunerGame(): ReactNode {
         overflowY: 'auto',
         boxSizing: 'border-box',
       }}>
+        {/* Slider thumb styling for better touch targets on iOS */}
+        <style>{`
+          .settings-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #475569;
+            height: 8px;
+            border-radius: 4px;
+          }
+          .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          }
+          .settings-slider::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          }
+          .settings-slider::-moz-range-track {
+            background: #475569;
+            height: 8px;
+            border-radius: 4px;
+          }
+        `}</style>
         <h1 style={{ color: '#fff', fontSize: 28, marginBottom: 24 }}>⚙️ Settings</h1>
 
         {/* Accuracy Slider (OK_THRESHOLD) */}
@@ -1215,6 +1250,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#f87171', fontSize: 12 }}>Hard</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
+                className="settings-slider"
                 type="range"
                 min={SETTINGS_RANGES.okThreshold.min}
                 max={SETTINGS_RANGES.okThreshold.max}
@@ -1248,6 +1284,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#f87171', fontSize: 12 }}>Hard</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
+                className="settings-slider"
                 type="range"
                 min={SETTINGS_RANGES.collapseThreshold.min}
                 max={SETTINGS_RANGES.collapseThreshold.max}
@@ -1280,6 +1317,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Short</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
+                className="settings-slider"
                 type="range"
                 min={SETTINGS_RANGES.holdDuration.min}
                 max={SETTINGS_RANGES.holdDuration.max}
@@ -1311,6 +1349,7 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Short</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
+                className="settings-slider"
                 type="range"
                 min={SETTINGS_RANGES.pauseBetweenNotes.min}
                 max={SETTINGS_RANGES.pauseBetweenNotes.max}
