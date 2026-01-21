@@ -1064,16 +1064,14 @@ export default function ViolinTunerGame(): ReactNode {
             style={{
               marginTop: 8,
               padding: '8px 16px',
-              fontSize: 16,
+              fontSize: 18,
               borderRadius: 8,
               border: 'none',
-              background: '#475569',
-              color: '#94a3b8',
+              background: '#334155',
+              color: '#cbd5e1',
               cursor: 'pointer',
-              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
             }}
           >
             <span style={{ fontSize: 20 }}>⚙️</span> Settings
@@ -1194,13 +1192,16 @@ export default function ViolinTunerGame(): ReactNode {
     return (
       <div style={{
         minHeight: '100vh',
+        maxHeight: '100vh',
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         padding: 20,
+        paddingBottom: 40,
         fontFamily: 'system-ui, sans-serif',
         overflowY: 'auto',
+        boxSizing: 'border-box',
       }}>
         <h1 style={{ color: '#fff', fontSize: 28, marginBottom: 24 }}>⚙️ Settings</h1>
 
@@ -1300,7 +1301,6 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Long</span>
           </div>
         </div>
-
         {/* Pause Between Notes Slider */}
         <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
           <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
