@@ -1235,9 +1235,6 @@ export default function ViolinTunerGame(): ReactNode {
             </div>
             <span style={{ color: '#f87171', fontSize: 12 }}>Easy</span>
           </div>
-          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
-            "Good" threshold: ±{Math.round(settings.okThreshold * 0.5)}¢
-          </div>
         </div>
 
         {/* Tower Stability Slider (COLLAPSE_THRESHOLD) */}
