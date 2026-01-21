@@ -57,6 +57,8 @@ interface GameSettings {
   holdDuration: number;         // ms to hold note in tune (400-1200, default 750)
   pauseBetweenNotes: number;    // ms to pause between notes (300-1000, default 600)
   enabledScales: string[];      // which scales appear in the dropdown
+  noCollapse: boolean;          // prevent tower from collapsing
+  hideTunerWhenPlaying: boolean; // hide pitch feedback while playing notes
 }
 
 // Default settings (current values = middle of each range)
@@ -66,6 +68,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   holdDuration: 750,
   pauseBetweenNotes: 600,
   enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'Tonalization 1A'],
+  noCollapse: false,
+  hideTunerWhenPlaying: false,
 };
 
 // Settings ranges for sliders
@@ -622,12 +626,12 @@ export default function ViolinTunerGame(): ReactNode {
   const [holdProgress, setHoldProgress] = useState<number>(0);
   const [collapseTime, setCollapseTime] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [noCollapse, setNoCollapse] = useState<boolean>(false);
+  const [noCollapse, setNoCollapse] = useState<boolean>(settings.noCollapse);
   const [score, setScore] = useState<number>(0);
   const [noteScores, setNoteScores] = useState<number[]>([]);
   const [isPausedBetweenNotes, setIsPausedBetweenNotes] = useState<boolean>(false);
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
-  const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(false);
+  const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(settings.hideTunerWhenPlaying);
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
 
   // Derived thresholds from settings
@@ -1045,8 +1049,13 @@ export default function ViolinTunerGame(): ReactNode {
             <input
               type="checkbox"
               checked={noCollapse}
-              onChange={(e) => setNoCollapse(e.target.checked)}
-              style={{ width: 18, height: 18 }}
+              onChange={(e) => {
+                setNoCollapse(e.target.checked);
+                const newSettings = { ...settings, noCollapse: e.target.checked };
+                setSettings(newSettings);
+                saveSettings(newSettings);
+              }}
+              style={{ width: 24, height: 24 }}
             />
             Keep tower from collapsing
           </label>
@@ -1054,8 +1063,13 @@ export default function ViolinTunerGame(): ReactNode {
             <input
               type="checkbox"
               checked={hideTunerWhenPlaying}
-              onChange={(e) => setHideTunerWhenPlaying(e.target.checked)}
-              style={{ width: 18, height: 18 }}
+              onChange={(e) => {
+                setHideTunerWhenPlaying(e.target.checked);
+                const newSettings = { ...settings, hideTunerWhenPlaying: e.target.checked };
+                setSettings(newSettings);
+                saveSettings(newSettings);
+              }}
+              style={{ width: 24, height: 24 }}
             />
             Hide tuner when playing
           </label>
