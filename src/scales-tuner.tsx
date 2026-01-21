@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import Vex from 'vexflow';
 
 // Type definitions
-type GameState = 'menu' | 'playing' | 'collapsed' | 'success';
+type GameState = 'menu' | 'settings' | 'playing' | 'collapsed' | 'success';
 type GameMode = 'practice' | 'test';
 
 interface NoteFrequencies {
@@ -50,14 +50,68 @@ interface FallingBrickProps {
   startTime: number;
 }
 
-// Game configuration constants
+// Settings interface for user-configurable options
+interface GameSettings {
+  okThreshold: number;          // cents ±window to accept a note (10-30, default 18)
+  collapseThreshold: number;    // instability points per note before tower falls (8-25, default 15)
+  holdDuration: number;         // ms to hold note in tune (400-1200, default 750)
+  pauseBetweenNotes: number;    // ms to pause between notes (300-1000, default 600)
+  enabledScales: string[];      // which scales appear in the dropdown
+}
+
+// Default settings (current values = middle of each range)
+const DEFAULT_SETTINGS: GameSettings = {
+  okThreshold: 18,
+  collapseThreshold: 15,
+  holdDuration: 750,
+  pauseBetweenNotes: 600,
+  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'Tonalization 1A'],
+};
+
+// Settings ranges for sliders
+const SETTINGS_RANGES = {
+  okThreshold: { min: 10, max: 30, step: 1 },           // hard (10) to easy (30)
+  collapseThreshold: { min: 8, max: 25, step: 1 },     // hard (8) to easy (25)
+  holdDuration: { min: 400, max: 1200, step: 50 },     // short (400) to long (1200)
+  pauseBetweenNotes: { min: 300, max: 1000, step: 50 }, // short (300) to long (1000)
+} as const;
+
+const STORAGE_KEY = 'scaleTowerSettings';
+
+// Load settings from localStorage
+function loadSettings(): GameSettings {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<GameSettings>;
+      // Merge with defaults to handle any missing fields
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        // Ensure enabledScales has at least one valid scale
+        enabledScales: parsed.enabledScales?.filter(s => s in SCALES).length 
+          ? parsed.enabledScales.filter(s => s in SCALES)
+          : DEFAULT_SETTINGS.enabledScales,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to load settings:', e);
+  }
+  return { ...DEFAULT_SETTINGS };
+}
+
+// Save settings to localStorage
+function saveSettings(settings: GameSettings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Failed to save settings:', e);
+  }
+}
+
+// Game configuration constants (non-configurable)
 const GAME_CONFIG = {
-  HOLD_DURATION: 750,           // ms to hold note in tune
-  OK_THRESHOLD: 18,             // cents ±window to accept a note
-  GOOD_THRESHOLD: 10,           // cents ±window for "Good!" feedback
   SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
-  COLLAPSE_THRESHOLD: 15,       // instability points per note before tower falls
-  PAUSE_BETWEEN_NOTES: 600,     // ms to pause between notes
 } as const;
 
 // Note frequencies for all scales (2 octaves)
@@ -343,7 +397,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 }
 
 // Play a tone with harmonic richness (sounds louder than pure sine wave)
-async function playTone(frequency: number, duration: number = GAME_CONFIG.HOLD_DURATION/1000): Promise<void> {
+async function playTone(frequency: number, duration: number = 0.75): Promise<void> {
   try {
     const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const audioContext = new AudioContextClass();
@@ -554,7 +608,11 @@ function FallingBrick({ brick, startTime }: FallingBrickProps): ReactNode {
 export default function ViolinTunerGame(): ReactNode {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('practice');
-  const [selectedScale, setSelectedScale] = useState<string>('G Major');
+  const [settings, setSettings] = useState<GameSettings>(() => loadSettings());
+  const [selectedScale, setSelectedScale] = useState<string>(() => {
+    const loaded = loadSettings();
+    return loaded.enabledScales[0] || 'G Major';
+  });
   const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(0);
   const [bricks, setBricks] = useState<Brick[]>([]);
   const [instability, setInstability] = useState<number>(0);
@@ -571,6 +629,13 @@ export default function ViolinTunerGame(): ReactNode {
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
   const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(false);
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
+
+  // Derived thresholds from settings
+  const OK_THRESHOLD = settings.okThreshold;
+  const GOOD_THRESHOLD = settings.okThreshold * 0.5;
+  const COLLAPSE_THRESHOLD = settings.collapseThreshold;
+  const HOLD_DURATION = settings.holdDuration;
+  const PAUSE_BETWEEN_NOTES = settings.pauseBetweenNotes;
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -638,7 +703,7 @@ export default function ViolinTunerGame(): ReactNode {
     autoplayNoteStartTimeRef.current = Date.now();
     const initialFrequency = targetFrequency;
     if (initialFrequency) {
-      await playTone(initialFrequency, GAME_CONFIG.HOLD_DURATION / 1000);
+      await playTone(initialFrequency, HOLD_DURATION / 1000);
     }
   };
 
@@ -692,7 +757,7 @@ export default function ViolinTunerGame(): ReactNode {
       return newScores;
     });
 
-    if (newInstability >= GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
+    if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
       setCollapseTime(Date.now());
       stopGame();
@@ -715,18 +780,18 @@ export default function ViolinTunerGame(): ReactNode {
     noteSamplesRef.current = [];
 
     return false; // not ended
-  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex]);
+  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex, COLLAPSE_THRESHOLD]);
 
   // Helper to accept a completed note (shared between practice and test modes)
   const acceptNote = useCallback(() => {
     const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-    const noteScore = Math.exp(-avgAbsCents / GAME_CONFIG.OK_THRESHOLD);
+    const noteScore = Math.exp(-avgAbsCents / OK_THRESHOLD);
     const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
     const error = avgAbsCents * (bias > 0 ? 1 : -1);
     const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
     setPauseAverageCents(avgCents);
     return handleAddNote(noteScore, error);
-  }, [handleAddNote]);
+  }, [handleAddNote, OK_THRESHOLD]);
 
   // Advance autoplay to the next note
   const advanceAutoplayNote = useCallback((noteError: number) => {
@@ -746,10 +811,10 @@ export default function ViolinTunerGame(): ReactNode {
       autoplayNoteStartTimeRef.current = Date.now();
       const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
       if (nextTargetFrequency) {
-        void playTone(nextTargetFrequency, GAME_CONFIG.HOLD_DURATION / 1000);
+        void playTone(nextTargetFrequency, HOLD_DURATION / 1000);
       }
-    }, GAME_CONFIG.PAUSE_BETWEEN_NOTES);
-  }, [isAutoplayMode, currentNoteIndex, scale, handleAddNote]);
+    }, PAUSE_BETWEEN_NOTES);
+  }, [isAutoplayMode, currentNoteIndex, scale, handleAddNote, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
 
   useEffect(() => {
     if (!isListening) return;
@@ -794,8 +859,8 @@ export default function ViolinTunerGame(): ReactNode {
       // Handle autoplay note completion
       if (isAutoplayMode && autoplayNoteStartTimeRef.current) {
         const autoplayElapsed = Date.now() - autoplayNoteStartTimeRef.current;
-        latestHoldProgressRef.current = Math.min(autoplayElapsed / GAME_CONFIG.HOLD_DURATION, 1);
-        if (autoplayElapsed >= GAME_CONFIG.HOLD_DURATION) {
+        latestHoldProgressRef.current = Math.min(autoplayElapsed / HOLD_DURATION, 1);
+        if (autoplayElapsed >= HOLD_DURATION) {
           const noteError = noteSamplesRef.current.length > 0 
             ? averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
             : 0;
@@ -811,7 +876,7 @@ export default function ViolinTunerGame(): ReactNode {
       // Handle pause between notes
       if (isPausedBetweenNotes && pauseStartTimeRef.current) {
         const pauseElapsed = Date.now() - pauseStartTimeRef.current;
-        if (pauseElapsed >= GAME_CONFIG.PAUSE_BETWEEN_NOTES) {
+        if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
           resetForNextNote();
         }
         return;
@@ -839,16 +904,16 @@ export default function ViolinTunerGame(): ReactNode {
           }
 
           if (gameMode === 'practice') {
-            if (Math.abs(cents) < GAME_CONFIG.OK_THRESHOLD) {
+            if (Math.abs(cents) < OK_THRESHOLD) {
               if (!holdStartRef.current) {
                 holdStartRef.current = Date.now();
               }
               const holdTime = Date.now() - holdStartRef.current;
               if (!isAutoplayMode) {
-                latestHoldProgressRef.current = Math.min(holdTime / GAME_CONFIG.HOLD_DURATION, 1);
+                latestHoldProgressRef.current = Math.min(holdTime / HOLD_DURATION, 1);
               }
 
-              if (holdTime >= GAME_CONFIG.HOLD_DURATION) {
+              if (holdTime >= HOLD_DURATION) {
                 noteAcceptedThisCycle = true;
                 acceptNote();
               }
@@ -860,9 +925,9 @@ export default function ViolinTunerGame(): ReactNode {
             const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
 
             if (!isAutoplayMode) {
-              latestHoldProgressRef.current = Math.min(elapsedInRange / GAME_CONFIG.HOLD_DURATION, 1);
+              latestHoldProgressRef.current = Math.min(elapsedInRange / HOLD_DURATION, 1);
             }
-            if (elapsedInRange >= GAME_CONFIG.HOLD_DURATION) {
+            if (elapsedInRange >= HOLD_DURATION) {
               noteAcceptedThisCycle = true;
               acceptNote();
             }
@@ -870,14 +935,14 @@ export default function ViolinTunerGame(): ReactNode {
         } else if (!isAutoplayMode) {
           pauseInRangeTimer();
           holdStartRef.current = null;
-          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0;
+          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
         }
       } else {
         latestPitchRef.current = null;
         if (!isAutoplayMode) {
           pauseInRangeTimer();
           holdStartRef.current = null;
-          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / GAME_CONFIG.HOLD_DURATION, 1) : 0;
+          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
         }
       }
     };
@@ -909,7 +974,7 @@ export default function ViolinTunerGame(): ReactNode {
         audioIntervalRef.current = null;
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
 
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : (isAutoplayMode && !currentPitch ? 0 : currentCents);
@@ -920,10 +985,10 @@ export default function ViolinTunerGame(): ReactNode {
     const sign = displayCents >= 0 ? '+' : '';
     const centText = `(${sign}${Math.round(displayCents)}¢)`;
     
-    if (absDisplayCents < GAME_CONFIG.GOOD_THRESHOLD) {
+    if (absDisplayCents < GOOD_THRESHOLD) {
       return { word: 'Good!', number: centText, color: getColorFromError(0) };
     }
-    if (absDisplayCents < GAME_CONFIG.OK_THRESHOLD) {
+    if (absDisplayCents < OK_THRESHOLD) {
       return { word: 'OK...', number: centText, color: getColorFromError(displayCents) };
     }
     if (displayCents > 0) {
@@ -969,7 +1034,7 @@ export default function ViolinTunerGame(): ReactNode {
               cursor: 'pointer',
             }}
           >
-            {Object.keys(SCALES).map(name => (
+            {settings.enabledScales.map(name => (
               <option key={name} value={name}>{formatScaleName(name)}</option>
             ))}
           </select>
@@ -994,6 +1059,25 @@ export default function ViolinTunerGame(): ReactNode {
             />
             Hide tuner when playing
           </label>
+          <button
+            onClick={() => setGameState('settings')}
+            style={{
+              marginTop: 8,
+              padding: '8px 16px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: 'transparent',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>⚙️</span> Settings
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: 16 }}>
@@ -1069,6 +1153,259 @@ export default function ViolinTunerGame(): ReactNode {
             </svg> then "Add to Home Screen"</div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Settings screen
+  if (gameState === 'settings') {
+    const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
+      const newSettings = { ...settings, [key]: value };
+      setSettings(newSettings);
+      saveSettings(newSettings);
+      // If selected scale is no longer enabled, switch to first enabled
+      if (key === 'enabledScales' && Array.isArray(value) && !value.includes(selectedScale)) {
+        setSelectedScale(value[0] || 'G Major');
+      }
+    };
+
+    const resetToDefaults = () => {
+      setSettings({ ...DEFAULT_SETTINGS });
+      saveSettings({ ...DEFAULT_SETTINGS });
+      setSelectedScale(DEFAULT_SETTINGS.enabledScales[0]);
+    };
+
+    const toggleScale = (scaleName: string) => {
+      const current = settings.enabledScales;
+      if (current.includes(scaleName)) {
+        // Don't allow disabling the last scale
+        if (current.length > 1) {
+          updateSetting('enabledScales', current.filter(s => s !== scaleName));
+        }
+      } else {
+        updateSetting('enabledScales', [...current, scaleName]);
+      }
+    };
+
+    // Helper to calculate slider position (0-100) from value
+    const getSliderPercent = (value: number, min: number, max: number) => 
+      ((value - min) / (max - min)) * 100;
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: 20,
+        fontFamily: 'system-ui, sans-serif',
+        overflowY: 'auto',
+      }}>
+        <h1 style={{ color: '#fff', fontSize: 28, marginBottom: 24 }}>⚙️ Settings</h1>
+
+        {/* Accuracy Slider (OK_THRESHOLD) */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Accuracy Tolerance</span>
+            <span style={{ color: '#94a3b8' }}>±{settings.okThreshold}¢</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#22e55f', fontSize: 12 }}>Hard</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                type="range"
+                min={SETTINGS_RANGES.okThreshold.min}
+                max={SETTINGS_RANGES.okThreshold.max}
+                step={SETTINGS_RANGES.okThreshold.step}
+                value={settings.okThreshold}
+                onChange={(e) => updateSetting('okThreshold', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              {/* Default marker */}
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.okThreshold, SETTINGS_RANGES.okThreshold.min, SETTINGS_RANGES.okThreshold.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#f87171', fontSize: 12 }}>Easy</span>
+          </div>
+          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+            "Good" threshold: ±{Math.round(settings.okThreshold * 0.5)}¢
+          </div>
+        </div>
+
+        {/* Tower Stability Slider (COLLAPSE_THRESHOLD) */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Tower Stability</span>
+            <span style={{ color: '#94a3b8' }}>{settings.collapseThreshold} pts/note</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#22e55f', fontSize: 12 }}>Hard</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                type="range"
+                min={SETTINGS_RANGES.collapseThreshold.min}
+                max={SETTINGS_RANGES.collapseThreshold.max}
+                step={SETTINGS_RANGES.collapseThreshold.step}
+                value={settings.collapseThreshold}
+                onChange={(e) => updateSetting('collapseThreshold', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.collapseThreshold, SETTINGS_RANGES.collapseThreshold.min, SETTINGS_RANGES.collapseThreshold.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#f87171', fontSize: 12 }}>Easy</span>
+          </div>
+        </div>
+
+        {/* Hold Duration Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Hold Duration</span>
+            <span style={{ color: '#94a3b8' }}>{settings.holdDuration}ms</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Short</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                type="range"
+                min={SETTINGS_RANGES.holdDuration.min}
+                max={SETTINGS_RANGES.holdDuration.max}
+                step={SETTINGS_RANGES.holdDuration.step}
+                value={settings.holdDuration}
+                onChange={(e) => updateSetting('holdDuration', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.holdDuration, SETTINGS_RANGES.holdDuration.min, SETTINGS_RANGES.holdDuration.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Long</span>
+          </div>
+        </div>
+
+        {/* Pause Between Notes Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Pause Between Notes</span>
+            <span style={{ color: '#94a3b8' }}>{settings.pauseBetweenNotes}ms</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Short</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                type="range"
+                min={SETTINGS_RANGES.pauseBetweenNotes.min}
+                max={SETTINGS_RANGES.pauseBetweenNotes.max}
+                step={SETTINGS_RANGES.pauseBetweenNotes.step}
+                value={settings.pauseBetweenNotes}
+                onChange={(e) => updateSetting('pauseBetweenNotes', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.pauseBetweenNotes, SETTINGS_RANGES.pauseBetweenNotes.min, SETTINGS_RANGES.pauseBetweenNotes.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Long</span>
+          </div>
+        </div>
+
+        {/* Scale Selection */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 12 }}>Enabled Scales</div>
+          <div style={{ 
+            background: 'rgba(255,255,255,0.05)', 
+            borderRadius: 8, 
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}>
+            {Object.keys(SCALES).map(scaleName => (
+              <label 
+                key={scaleName} 
+                style={{ 
+                  color: '#cbd5e1', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 8,
+                  cursor: 'pointer',
+                  opacity: settings.enabledScales.length === 1 && settings.enabledScales.includes(scaleName) ? 0.5 : 1,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.enabledScales.includes(scaleName)}
+                  onChange={() => toggleScale(scaleName)}
+                  disabled={settings.enabledScales.length === 1 && settings.enabledScales.includes(scaleName)}
+                  style={{ width: 18, height: 18 }}
+                />
+                {formatScaleName(scaleName)}
+              </label>
+            ))}
+          </div>
+          <div style={{ color: '#64748b', fontSize: 12, marginTop: 4 }}>
+            At least one scale must be enabled
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          <button
+            onClick={resetToDefaults}
+            style={{
+              padding: '12px 24px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: '#475569',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Reset to Defaults
+          </button>
+          <button
+            onClick={() => setGameState('menu')}
+            style={{
+              padding: '12px 24px',
+              fontSize: 16,
+              borderRadius: 8,
+              border: 'none',
+              background: 'linear-gradient(135deg, #22e55f 0%, #16c75c 100%)',
+              color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Done
+          </button>
+        </div>
       </div>
     );
   }
@@ -1208,9 +1545,9 @@ export default function ViolinTunerGame(): ReactNode {
           overflow: 'hidden',
         }}>
           <div style={{
-            width: `${Math.min(100, (instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%`,
+            width: `${Math.min(100, (instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%`,
             height: '100%',
-            background: getColorFromError(instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length ) * 50),
+            background: getColorFromError(instability / (COLLAPSE_THRESHOLD * scale.notes.length ) * 50),
             transition: 'all 0.4s ease',
           }} />
         </div>
@@ -1340,7 +1677,7 @@ export default function ViolinTunerGame(): ReactNode {
             Score: {score}
           </div>
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
-            Tower stability: {Math.round((1 - instability / (GAME_CONFIG.COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
+            Tower stability: {Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
           </p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
