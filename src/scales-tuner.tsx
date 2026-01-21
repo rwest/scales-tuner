@@ -1034,7 +1034,7 @@ export default function ViolinTunerGame(): ReactNode {
               cursor: 'pointer',
             }}
           >
-            {settings.enabledScales.map(name => (
+            {Object.keys(SCALES).filter(name => settings.enabledScales.includes(name)).map(name => (
               <option key={name} value={name}>{formatScaleName(name)}</option>
             ))}
           </select>
