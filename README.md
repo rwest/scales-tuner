@@ -5,63 +5,54 @@ A browser-based violin tuner game built with React and Vite. Optimized for iPhon
 
 ## Features
 - Live pitch detection via Web Audio API with cents readout and visual pitch meter.
-- Built-in scales including G/Bb/A/D Major, G/A Melodic Minor, and Tonalization 1A.
-- Two gameplay modes: Practice and Test, each with tailored scoring.
-- Music staff display with correct key signature (VexFlow) and proper stem direction.
-- Accuracy-based scoring and instability meter (collapse optional via toggle).
-- Hold/sampling window: place bricks by staying accurate or by completing a sampling window (mode-dependent).
+- Built-in scales including G/B♭/A/D Major, G/A Melodic Minor, and Tonalization 1A.
+- Two gameplay modes: Practice (continuous hold) and Test (accumulated time).
+- Music staff display with correct key signature (VexFlow).
+- Configurable difficulty via Settings screen (thresholds, timing, enabled scales).
+- Accuracy-based scoring normalized to 100 points per scale.
 
-## Getting started
+## Getting Started
 
 ### Play Online
 Visit **[https://rwest.github.io/scales-tuner/](https://rwest.github.io/scales-tuner/)** to play immediately in your browser.
 
 ### Run Locally
-1) Clone the repository: `git clone git@github.com:rwest/scales-tuner.git`
-2) Install dependencies: `npm install`
-3) Run the dev server: `npm run dev`
-4) Open the shown local URL in a desktop browser.
-5) Allow microphone access when prompted; audio input is required for gameplay.
+```bash
+git clone git@github.com:rwest/scales-tuner.git
+cd scales-tuner
+npm install
+npm run dev
+```
+Open the shown local URL and allow microphone access when prompted.
 
 #### Testing on iPhone with ngrok
-Microphone access requires HTTPS, so to test on an iPhone:
+Microphone access requires HTTPS. To test on iPhone, install [ngrok](https://ngrok.com/download) if you haven't already (the free tier works fine). Then:
 
-1) Install [ngrok](https://ngrok.com/download) if you haven't already
-2) Start the dev server: `npm run dev` (note the port, typically 5173)
-3) In a new terminal, create an HTTPS tunnel: `ngrok http 5173`
-4) Copy the `https://` forwarding URL from ngrok's output
-5) Open that URL on your iPhone
-6) Allow microphone access when prompted
+1. Start the dev server: `npm run dev`
+2. In a new terminal: `ngrok http 5173`
+3. Open the `https://` forwarding URL on your iPhone
+4. Allow microphone access when prompted
 
-Note: The free ngrok tier works fine for development testing.
+## How to Play
+1. Choose a scale from the dropdown.
+2. Pick a mode: **Practice** (green) or **Test** (blue).
+3. Play the displayed note; tap the speaker icon to hear a reference pitch.
+4. Keep the pitch indicator centered (green) to fill the progress bar.
+5. Stack a brick for each note; finish the scale to see your score.
 
-## How to play
-- Choose a scale and optionally enable "Keep tower from collapsing" (applies to both modes).
-- Pick a mode:
-	- Practice: press the green Practice button.
-	- Test: press the blue Test button.
-- Play the displayed note; use the speaker button to hear a reference pitch.
-- Progress bar behavior:
-	- Practice: fills while you stay within the OK window (±18¢); leaving that window resets the bar but samples still count for scoring.
-	- Test: fills with accumulated in-range time (within SAME_NOTE_THRESHOLD, ±50¢); pauses when out-of-range and resumes where it left off.
-- Stack a brick for each note; finish the scale to see your score.
+### Modes
+- **Practice**: Hold continuously within the OK threshold to advance. Leaving the window resets the timer but samples still count for scoring.
+- **Test**: Accumulate in-range time (can pause and resume). Auto-advances after enough accumulated time.
 
-## Modes
-- **Practice Mode**
-	- Advance when you stay continuously within the OK window (±18¢) for the hold duration.
-	- Leaving the OK window resets the hold timer but samples persist for scoring.
-	- Per-note score ≈ `exp(-avg_abs_cents/OK_THRESHOLD)` (average of all samples collected during note attempt).
+Both modes score each note as `exp(-avg_abs_cents / OK_THRESHOLD)`, normalized to 100 total.
 
-- **Test Mode**
-	- Accumulates time while within the same-note threshold (±50¢); pauses timer when out-of-range.
-	- Auto-advances after accumulating the hold duration of in-range time.
-	- Per-note score ≈ `exp(-avg_abs_cents/OK_THRESHOLD)` (average of all samples collected).
+## Settings
+Access the Settings screen from the menu to customize:
+- **OK Threshold**: Cents window to accept a note (difficulty)
+- **Collapse Threshold**: Instability budget before tower falls
+- **Hold Duration**: How long to hold a note
+- **Pause Between Notes**: Delay after each note
+- **Enabled Scales**: Choose which scales appear in the dropdown
+- **Toggle options**: Keep tower from collapsing, Hide tuner while playing
 
-### Scoring & thresholds
-- Scores are normalized to 100 total across the whole scale.
-- OK window (`OK_THRESHOLD`): default 18 cents; "Good!" band at ±10 cents.
-- Same-note window (`SAME_NOTE_THRESHOLD`): default 50 cents.
-- Hold/sampling duration (`HOLD_DURATION`): default 750 ms.
-- Pause after a locked note (`PAUSE_BETWEEN_NOTES`): 600 ms.
-- Collapse budget (`COLLAPSE_THRESHOLD`): 15 instability points per note (total scales with note count).
-- See implementation in [src/scales-tuner.tsx](src/scales-tuner.tsx).
+Settings persist in your browser's local storage.

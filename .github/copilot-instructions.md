@@ -4,167 +4,100 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 
 ## Architecture Overview
 
-**Single-File Design**: The entire game logic lives in [src/scales-tuner.tsx](src/scales-tuner.tsx) (~1300 lines). This is intentional—UI, audio, game state, and rendering are tightly coupled for real-time responsiveness.
+**Single-File Design**: The entire game logic lives in [src/scales-tuner.tsx](src/scales-tuner.tsx) (~1800 lines). UI, audio, game state, and rendering are tightly coupled for real-time responsiveness.
 
 **Tech Stack**:
-- React 19 with TypeScript for type-safe state management
-- Vite for dev server (fast HMR) and production builds
+- React 19 with TypeScript
+- Vite for dev server and builds
 - Web Audio API for microphone input and pitch detection
-- VexFlow for music notation rendering (treble clef with key signatures)
-- ESLint + TypeScript ESLint for code quality
+- VexFlow for music notation rendering
 
 **Game Loop**:
 1. Microphone input → autocorrelation pitch detection
-2. Compare detected frequency to target note frequency (in cents, where 100 cents = 1 semitone)
-3. Collect accuracy samples continuously when within `SAME_NOTE_THRESHOLD` (default 50¢)
-4. Practice mode: Advance when continuously within `OK_THRESHOLD` for `HOLD_DURATION` (750ms)
-5. Test mode: Auto-advance after accumulating `HOLD_DURATION` of in-range time (still within `SAME_NOTE_THRESHOLD`)
+2. Compare detected frequency to target note frequency (in cents)
+3. Collect accuracy samples when within `SAME_NOTE_THRESHOLD` (50¢)
+4. Practice mode: Advance when continuously within OK threshold for hold duration
+5. Test mode: Auto-advance after accumulating hold duration of in-range time
 6. Per-note score: `exp(-avg_abs_cents / OK_THRESHOLD)` normalized to 100 total
-7. Each brick's color and angle reflect tuning accuracy; tower collapses when instability ≥ `COLLAPSE_THRESHOLD * noteCount`
+7. Tower collapses when instability ≥ collapse threshold × note count
 
-## Key Constants & Tuning Parameters
+## Settings System
 
-All in [src/scales-tuner.tsx](src/scales-tuner.tsx):
+Many game parameters are now **user-configurable** via a Settings screen. The `GameSettings` interface includes:
+- `okThreshold`: Cents window to accept a note
+- `collapseThreshold`: Instability budget per note
+- `holdDuration`: Ms to hold note before it locks
+- `pauseBetweenNotes`: Ms delay after each note
+- `enabledScales`: Which scales appear in the dropdown
+- `noCollapse`: Prevent tower from collapsing
+- `hideTunerWhenPlaying`: Hide pitch feedback during play
 
-```typescript
-const HOLD_DURATION = 750;           // ms to hold note in tune
-const OK_THRESHOLD = 18;             // ±cents window to accept a note
-const GOOD_THRESHOLD = 10;           // ±cents window for "Good!" feedback
-const SAME_NOTE_THRESHOLD = 50;      // ±cents to recognize same target note
-const COLLAPSE_THRESHOLD = 15;       // instability points per note before tower falls
-const PAUSE_BETWEEN_NOTES = 600;     // ms to pause between notes
-```
+Settings are stored in `localStorage` under key `scaleTowerSettings`. Default values are in `DEFAULT_SETTINGS`, and slider ranges are in `SETTINGS_RANGES`.
 
-Samples are **collected continuously** when within `SAME_NOTE_THRESHOLD`, persist across pauses/silence, and accumulate until the note completes. This distinction matters for understanding why scores don't reset if you briefly stop playing.
+The only non-configurable constant is `GAME_CONFIG.SAME_NOTE_THRESHOLD` (50¢).
 
-## Critical Functions & Patterns
+## Critical Functions
 
-**Pitch Detection**: `autoCorrelate(buffer, sampleRate)` implements autocorrelation with RMS signal threshold (0.01) to reject noise. Returns frequency in Hz or -1 if too quiet.
+**Pitch Detection**: `autoCorrelate(buffer, sampleRate)` — autocorrelation with RMS threshold (0.01) to reject noise. Returns Hz or -1.
 
-**Accuracy Calculation**: `getCents(frequency, targetFrequency)` = `1200 * log₂(frequency / targetFrequency)`. Positive = sharp, negative = flat. UI feedback uses `GOOD_THRESHOLD` (10¢) and `OK_THRESHOLD` (18¢) bands.
+**Accuracy**: `getCents(frequency, targetFrequency)` = `1200 * log₂(freq / target)`. Positive = sharp, negative = flat.
 
 **Brick Behavior**:
-- Angle = `cents × 1.5` (visual indicator of intonation)
-- Color: Green (in-tune) → Red (sharp) or Blue (flat) gradient
-- `getColorFromError()` interpolates RGB based on cents deviation (clamped to ±50¢)
-- Instability sums `abs(angle)` and triggers collapse when it reaches `COLLAPSE_THRESHOLD * noteCount`.
+- Angle = `cents × 1.5`
+- Color: `getColorFromError()` interpolates Green→Red (sharp) or Green→Blue (flat)
 
-**Scale System**: `SCALES` object defines note sequences (up to 2 octaves). Each scale has a key signature; `getKeySignatureForScale()` maps to VexFlow key signatures ('G', 'Bb', 'A', 'D', 'C'). Menu toggles: "Keep tower from collapsing" (safety) and "Hide tuner when playing" (reduces live feedback until pauses).
+**Scale System**: `SCALES` object defines note sequences. `getKeySignatureForScale()` maps to VexFlow key signatures.
 
-## Workflow & Building
+## Workflow
 
 ```bash
-npm run dev       # Start Vite dev server (http://localhost:5173)
-npm run build     # Production build → dist/
-npm run lint      # Run ESLint
-npm run preview   # Serve dist/ locally
+npm run dev       # Dev server (localhost:5173)
+npm run build     # Production build
+npm run lint      # ESLint
+npm run preview   # Preview build
 ```
 
-**ESLint Config**: Flat config with TypeScript support; ignores `dist/`. Rules allow uppercase pattern variables (e.g., `const G_MAJOR_SCALE`).
-
-**Vite Config**: Base path `/scales-tuner/` for GitHub Pages; dev server allows ngrok domains for iPhone testing over HTTPS.
-
-**Auto-Deployment**: Push to `main` triggers GitHub Actions → builds and deploys to GitHub Pages.
-
-## Development Patterns
-
-**React Hooks Usage**:
-- `useState`: Game state, current note, bricks array, pitch, score, instability
-- `useRef`: AudioContext, AnalyserNode, media stream, animation frame ID, timers
-- `useEffect`: Pitch detection loop (continuous during gameplay)
-- `useCallback`: `stopGame()` cleanup function for audio resources
-
-**Component Structure**: `StaveNoteDisplay` (VexFlow rendering), `PitchIndicator` (gradient bar), `Brick` (tower piece), `FallingBrick` (collapse animation).
-
-**Event Binding**: Game reacts to `gameState` and `currentNoteIndex` changes; UI renders conditionally based on these values.
+Push to `main` triggers GitHub Actions deployment to GitHub Pages.
 
 ## Common Modifications
 
 **Add a Scale**: 
 1. Add notes to `SCALES` object
-2. Add key signature to `getKeySignatureForScale()` map
-3. Ensure notes exist in `NOTE_FREQUENCIES` (add sharps/flats if needed)
+2. Add key signature to `getKeySignatureForScale()`
+3. Ensure notes exist in `NOTE_FREQUENCIES`
+4. Add to `DEFAULT_SETTINGS.enabledScales`
 
-**Adjust Tuning Strictness**: Lower `OK_THRESHOLD` (now 18¢) for stricter grading.
+**Adjust Defaults**: Edit `DEFAULT_SETTINGS` or `SETTINGS_RANGES`.
 
-**Change Hold Timing**: Modify `HOLD_DURATION` (now 750ms).
+**Modify Colors**: Edit `getColorFromError()` function.
 
-**Modify Color Scheme**: Edit RGB interpolation in `getColorFromError()` function (currently: green→red for sharp, green→blue for flat).
+## Audio Pipeline
 
-**Music Notation**: Update `getKeySignatureForScale()` or `StaveNoteDisplay` to change treble clef rendering.
+1. `getUserMedia({ audio: true })` requests microphone
+2. `AudioContext` + `AnalyserNode` (fftSize 2048)
+3. Audio processing runs at ~40Hz via `setInterval` (decoupled from rAF for iOS compatibility)
+4. Visual updates via `requestAnimationFrame`
+5. `playTone()` generates reference tones with harmonics
 
-## Testing Notes
+## Debugging
 
-- **Desktop Chrome recommended** for best Web Audio API support
-- Microphone permission required; grant when prompted
-- Use `npm run dev` for hot-reload testing
-- For mobile testing: use ngrok tunnel with `npm run dev` (see README.md)
+- Console for audio errors
+- React DevTools for `gameState`, `settings`, `bricks`, `instability`
+- iOS Safari throttles rAF—audio loop uses `setInterval` for reliability
 
-## Audio Pipeline & Web Audio API
+## Commit Message Format
 
-1. `navigator.mediaDevices.getUserMedia({ audio: true })` requests microphone
-2. Create `AudioContext` and connect media stream → `AnalyserNode`
-3. `AnalyserNode.fftSize = 2048` (frequency resolution)
-4. Every animation frame: `getByteFrequencyData()` or `getByteTimeDomainData()` → `autoCorrelate()`
-5. Reference tone generation: `playTone()` creates sine wave + harmonics via `OscillatorNode`
-
-**Important**: AudioContext suspend/resume may be required depending on browser autoplay policies; test on multiple browsers.
-
-## Debugging Guide
-
-- **Console logs**: Check browser DevTools → Console for audio errors
-- **React DevTools**: Inspect `gameState`, `currentNoteIndex`, `bricks` array, `instability`
-- **Hold/Timing Issues**: Check `HOLD_DURATION` and sample collection logic in pitch loop
-- **Color Mismatches**: Verify RGB values in `getColorFromError()` match intended gradient
-- **Pitch Detection Failing**: Increase RMS threshold in `autoCorrelate()` or check microphone input
-
-## Commit Message Guidelines
-
-After each modification, draft a commit message with:
-
-**Format**:
 ```
 <type>: <subject (50 chars max)>
 
-<body (explain the why, not just the what)>
+<body explaining why>
 ```
 
-**Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `perf`, `chore`
-
-**Examples**:
-```
-feat: Add A Melodic Minor scale
-
-Added A Melodic Minor to SCALES with correct ascending intervals.
-Updated getKeySignatureForScale() to use C (no accidentals).
-Allows users to practice this common violin etude scale.
-```
-
-```
-fix: Lower OK_THRESHOLD to 15 cents
-
-Reduced from 18¢ to enforce stricter intonation accuracy.
-Users reported too-lenient grading; narrower window aligns
-with professional tuning expectations.
-```
-
-```
-perf: Optimize autocorrelation RMS calculation
-
-Cache RMS computation to avoid recalculating per buffer.
-Pitch detection now 5-10% faster on mobile devices.
-```
-
-**Body tips**:
-- Keep to 2-3 sentences
-- Explain the motivation (why this change was needed)
-- Mention any side effects or dependencies
-- Reference specific constants/functions if changed
+Types: `feat`, `fix`, `refactor`, `docs`, `perf`, `chore`
 
 ## References
 
 - [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-- [VexFlow Music Notation](https://www.vexflow.com/)
-- [Autocorrelation Pitch Detection](https://en.wikipedia.org/wiki/Autocorrelation#Application_to_pitch_detection)
+- [VexFlow](https://www.vexflow.com/)
+- [Autocorrelation Pitch Detection](https://en.wikipedia.org/wiki/Autocorrelation)
 - [Musical Cents](https://en.wikipedia.org/wiki/Cent_(music))
-- [Equal Temperament Tuning](https://en.wikipedia.org/wiki/Equal_temperament)
