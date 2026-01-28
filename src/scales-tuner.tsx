@@ -1039,8 +1039,8 @@ export default function ViolinTunerGame(): ReactNode {
     // Check immediately when menu loads
     void checkForUpdate();
 
-    // Check every 30 seconds while on menu
-    const interval = setInterval(() => void checkForUpdate(), 30000);
+    // Check every 5 minutes while on menu
+    const interval = setInterval(() => void checkForUpdate(), 300000);
 
     return () => clearInterval(interval);
   }, [gameState]);
