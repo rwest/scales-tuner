@@ -638,6 +638,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
   const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(settings.hideTunerWhenPlaying);
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
+  const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
 
   // Derived thresholds from settings
   const OK_THRESHOLD = settings.okThreshold;
@@ -985,6 +986,65 @@ export default function ViolinTunerGame(): ReactNode {
     };
   }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
 
+  // Version checking - periodically check for updates when on menu screen
+  useEffect(() => {
+    if (gameState !== 'menu') {
+      return;
+    }
+
+    const currentBuildNumber = import.meta.env.VITE_BUILD_NUMBER || 'dev';
+    
+    const checkForUpdate = async () => {
+      // Don't check in dev mode
+      if (currentBuildNumber === 'dev') {
+        return;
+      }
+
+      try {
+        const baseUrl = import.meta.env.BASE_URL || '/';
+        const versionUrl = `${baseUrl}version.json?t=${Date.now()}`; // Cache bust
+        
+        const response = await fetch(versionUrl, {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        if (!response.ok) {
+          console.log('Version check failed - version.json not found');
+          return;
+        }
+
+        const versionData = await response.json() as { buildNumber: string; buildDate: string; timestamp: number };
+        const remoteBuildNumber = versionData.buildNumber;
+
+        // Compare build numbers (they should be integers from GitHub run_number)
+        const current = parseInt(currentBuildNumber, 10);
+        const remote = parseInt(remoteBuildNumber, 10);
+
+        if (!isNaN(remote) && !isNaN(current) && remote > current) {
+          console.log(`Update available: ${current} -> ${remote}`);
+          setUpdateAvailable(true);
+        } else {
+          console.log(`No update available (current: ${current}, remote: ${remote})`);
+        }
+      } catch (error) {
+        console.log('Error checking for updates:', error);
+      }
+    };
+
+    // Check immediately when menu loads
+    void checkForUpdate();
+
+    // Check every 5 minutes while on menu
+    const interval = setInterval(() => void checkForUpdate(), 300000);
+
+    return () => clearInterval(interval);
+  }, [gameState]);
+
   const getTuningIndicator = (): TuningIndicator => {
     const displayCents = isPausedBetweenNotes ? pauseAverageCents : (isAutoplayMode && !currentPitch ? 0 : currentCents);
     const absDisplayCents = Math.abs(displayCents);
@@ -1149,6 +1209,42 @@ export default function ViolinTunerGame(): ReactNode {
         <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>
           {import.meta.env.VITE_BUILD_NUMBER ? `v${import.meta.env.VITE_BUILD_NUMBER}` : 'dev'} • {__BUILD_DATE__}
         </p>
+
+        {updateAvailable && (
+          <div style={{
+            marginBottom: 16,
+            padding: '12px 20px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            borderRadius: 12,
+            color: '#fff',
+            textAlign: 'center',
+            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
+            maxWidth: 320,
+          }}>
+            <div style={{ fontWeight: 'bold', marginBottom: 8 }}>
+              🎉 Update Available!
+            </div>
+            <div style={{ fontSize: 14, marginBottom: 12 }}>
+              A new version is available
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '8px 24px',
+                fontSize: 16,
+                fontWeight: 'bold',
+                borderRadius: 8,
+                border: 'none',
+                background: '#fff',
+                color: '#059669',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+              }}
+            >
+              Reload Now
+            </button>
+          </div>
+        )}
 
         {isIPhoneNotStandalone() && (
           <div style={{
