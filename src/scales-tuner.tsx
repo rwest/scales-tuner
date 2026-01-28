@@ -67,7 +67,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   collapseThreshold: 15,
   holdDuration: 750,
   pauseBetweenNotes: 600,
-  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'Tonalization 1A'],
+  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A'],
   noCollapse: false,
   hideTunerWhenPlaying: false,
 };
@@ -149,6 +149,9 @@ const SCALES: ScalesType = {
   },
   'D Major': {
     notes: ['D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C#5', 'D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C#6', 'D6', 'C#6', 'B5', 'A5', 'G5', 'F#5', 'E5', 'D5', 'C#5', 'B4', 'A4', 'G4', 'F#4', 'E4', 'D4' ],
+  },
+  'D Minor Melodic': {
+    notes: ['D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C#5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C#6', 'D6', 'C6', 'Bb5', 'A5', 'G5', 'F5', 'E5', 'D5', 'C5', 'Bb4', 'A4', 'G4', 'F4', 'E4', 'D4'],
   },
   'Tonalization 1A': {
     notes: ['G4', 'B4', 'D5', 'G5', 'A5', 'B5', 'A5', 'G5', 'D5', 'E5', 'D5', 'B4', 'G4'],
@@ -257,6 +260,7 @@ function getKeySignatureForScale(scaleName: string): string {
     'A Major': 'A',
     'A Minor Melodic': 'C', // A Melodic Minor has no key signature accidentals
     'D Major': 'D',
+    'D Minor Melodic': 'F', // D Melodic Minor has 1 flat
     'Tonalization 1A': 'G',
   };
   return keyMap[scaleName];
