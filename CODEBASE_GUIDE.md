@@ -75,6 +75,9 @@ The game has a **Settings screen** where users can customize:
 - **Collapse Threshold**: Instability budget per note before tower falls
 - **Hold Duration**: How long to hold a note before it locks
 - **Pause Between Notes**: Delay after each note
+- **Trim worst samples**: Fraction of outlier samples to remove from scoring (0-40%)
+- **Curve shape (p)**: How sharply scores drop with error (1.0-4.0)
+- **Score tolerance (k×GOOD)**: Cents window for good scores (1.0-3.0 multiplier)
 - **Enabled Scales**: Which scales appear in the dropdown
 - **Toggle options**: "Keep tower from collapsing", "Hide tuner when playing"
 
@@ -91,6 +94,7 @@ Settings are persisted to `localStorage` under the key `scaleTowerSettings`.
 #### **Core Functions**
 - `autoCorrelate()`: Autocorrelation pitch detection from audio buffer
 - `getCents()`: Calculate cents difference between frequencies
+- `trimmedMeanAbs()`: Compute trimmed mean of absolute cents (robust error statistic)
 - `getColorFromError()`: Map cents deviation to RGB color
 - `getAngleFromError()`: Map cents deviation to brick rotation angle
 - `getKeySignatureForScale()`: Map scale names to VexFlow key signatures
@@ -138,8 +142,20 @@ playing → (success | collapsed) → menu
 - Positive = sharp, negative = flat
 
 ### Scoring
-- Per-note score: `exp(-avg_abs_cents / OK_THRESHOLD)`
+- **Robust Error Statistic**: Uses trimmed mean of absolute cents (E) to reduce impact of outliers
+  - By default, trims top 20% of worst samples
+  - Always keeps at least 1 sample to avoid edge cases
+- **Shaped Curve**: `noteScore = exp(-(E/tau)^p)` where:
+  - `tau = k × GOOD_THRESHOLD` (τ determines the cents window for good scores)
+  - `p` controls curve sharpness (default 2)
+  - `k` is a multiplier (default 1.8)
+  - `GOOD_THRESHOLD = OK_THRESHOLD × 0.5`
+- **Configurable parameters** in Settings:
+  - `trimTop`: Fraction of outliers to trim (0.0-0.4, default 0.2)
+  - `scoreExponentP`: Curve sharpness (1.0-4.0, default 2)
+  - `tauMultiplier`: Score tolerance multiplier (1.0-3.0, default 1.8)
 - Normalized to 100 points total across the scale
+- **Design Goal**: Players who consistently stay in the "GOOD" range should achieve scores around 95-100
 
 ### Instability & Tower
 - Each brick adds `abs(angle)` to instability (angle = cents × 1.5)

@@ -254,12 +254,6 @@ function getColorFromError(error: number): string {
   }
 }
 
-function averageAbsoluteCents(samples: number[]): number {
-  return samples.length
-    ? samples.reduce((sum, c) => sum + Math.abs(c), 0) / samples.length
-    : 0;
-}
-
 // Trimmed mean of absolute cents (removes top outliers)
 function trimmedMeanAbs(samples: number[], trimTop: number): number {
   if (samples.length === 0) return 0;
