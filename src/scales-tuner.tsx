@@ -1573,7 +1573,7 @@ export default function ViolinTunerGame(): ReactNode {
             How sharply scores drop with error (higher = steeper penalty)
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ color: '#94a3b8', fontSize: 12 }}>Linear</span>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Gentle</span>
             <div style={{ flex: 1, position: 'relative', height: 24 }}>
               <input
                 className="settings-slider"
