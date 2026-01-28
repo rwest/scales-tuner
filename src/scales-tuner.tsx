@@ -291,6 +291,7 @@ const KEY_SIGNATURE_ACCIDENTALS: Record<string, Record<string, '#' | 'b'>> = {
   'D': { F: '#', C: '#' },
   'A': { F: '#', C: '#', G: '#' },
   // Flats
+  'F': { B: 'b' },
   'Bb': { B: 'b', E: 'b' },
   'Eb': { B: 'b', E: 'b', A: 'b' },
   // Natural

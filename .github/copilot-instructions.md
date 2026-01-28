@@ -64,8 +64,9 @@ Push to `main` triggers GitHub Actions deployment to GitHub Pages.
 **Add a Scale**: 
 1. Add notes to `SCALES` object
 2. Add key signature to `getKeySignatureForScale()`
-3. Ensure notes exist in `NOTE_FREQUENCIES`
-4. Add to `DEFAULT_SETTINGS.enabledScales`
+3. Add key signature accidentals to `KEY_SIGNATURE_ACCIDENTALS` if the key is new
+4. Ensure notes exist in `NOTE_FREQUENCIES`
+5. Add to `DEFAULT_SETTINGS.enabledScales`
 
 **Adjust Defaults**: Edit `DEFAULT_SETTINGS` or `SETTINGS_RANGES`.
 
