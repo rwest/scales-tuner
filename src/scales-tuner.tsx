@@ -59,6 +59,9 @@ interface GameSettings {
   enabledScales: string[];      // which scales appear in the dropdown
   noCollapse: boolean;          // prevent tower from collapsing
   hideTunerWhenPlaying: boolean; // hide pitch feedback while playing notes
+  trimTop: number;              // fraction trimmed from top tail (0.0-0.4, default 0.2)
+  scoreExponentP: number;       // p in exp(-(E/tau)^p) (1.0-4.0, default 2)
+  tauMultiplier: number;        // k in tau = k*GOOD_THRESHOLD (1.0-3.0, default 1.8)
 }
 
 // Default settings (current values = middle of each range)
@@ -70,6 +73,9 @@ const DEFAULT_SETTINGS: GameSettings = {
   enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A'],
   noCollapse: false,
   hideTunerWhenPlaying: false,
+  trimTop: 0.2,
+  scoreExponentP: 2,
+  tauMultiplier: 2.0,
 };
 
 // Settings ranges for sliders
@@ -78,6 +84,9 @@ const SETTINGS_RANGES = {
   collapseThreshold: { min: 8, max: 22, step: 1 },     // hard (8) to easy (25)
   holdDuration: { min: 400, max: 1100, step: 50 },     // short (400) to long (1200)
   pauseBetweenNotes: { min: 300, max: 900, step: 50 }, // short (300) to long (1000)
+  trimTop: { min: 0.00, max: 0.40, step: 0.05 },       // outlier trim fraction
+  scoreExponentP: { min: 1.0, max: 3.0, step: 0.1 },  // curve sharpness
+  tauMultiplier: { min: 1.0, max: 3.0, step: 0.1 },    // score sensitivity
 } as const;
 
 const STORAGE_KEY = 'scaleTowerSettings';
@@ -245,10 +254,17 @@ function getColorFromError(error: number): string {
   }
 }
 
-function averageAbsoluteCents(samples: number[]): number {
-  return samples.length
-    ? samples.reduce((sum, c) => sum + Math.abs(c), 0) / samples.length
-    : 0;
+// Trimmed mean of absolute cents (removes top outliers)
+function trimmedMeanAbs(samples: number[], trimTop: number): number {
+  if (samples.length === 0) return 0;
+  
+  const abs = samples.map(c => Math.abs(c));
+  abs.sort((a, b) => a - b);
+  
+  const keepCount = Math.max(1, Math.floor(abs.length * (1 - trimTop)));
+  const trimmed = abs.slice(0, keepCount);
+  
+  return trimmed.reduce((sum, val) => sum + val, 0) / trimmed.length;
 }
 
 // Map scale names to VexFlow key signatures
@@ -794,14 +810,37 @@ export default function ViolinTunerGame(): ReactNode {
 
   // Helper to accept a completed note (shared between practice and test modes)
   const acceptNote = useCallback(() => {
-    const avgAbsCents = averageAbsoluteCents(noteSamplesRef.current);
-    const noteScore = Math.exp(-avgAbsCents / OK_THRESHOLD);
+    // Use trimmed mean of absolute cents for robust error statistic
+    const E = trimmedMeanAbs(noteSamplesRef.current, settings.trimTop);
+    
+    // Calculate tau and new score mapping
+    const tau = settings.tauMultiplier * GOOD_THRESHOLD;
+    const p = settings.scoreExponentP;
+    const noteScore = Math.exp(-Math.pow(E / tau, p));
+    
+    // Calculate signed error for visuals (brick angle/color)
     const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
-    const error = avgAbsCents * (bias > 0 ? 1 : -1);
-    const avgCents = averageAbsoluteCents(noteSamplesRef.current) * (bias > 0 ? 1 : -1);
-    setPauseAverageCents(avgCents);
+    const sign = bias > 0 ? 1 : -1;
+    const error = E * sign;
+    const avgCentsForPauseDisplay = E * sign;
+    
+    // Debug logging for calibration (dev only)
+    if (import.meta.env.DEV) {
+      console.log('[Score Debug]', {
+        sampleCount: noteSamplesRef.current.length,
+        E: E.toFixed(2),
+        tau: tau.toFixed(2),
+        p: p,
+        k: settings.tauMultiplier,
+        trimTop: settings.trimTop,
+        noteScore: noteScore.toFixed(4),
+        error: error.toFixed(2),
+      });
+    }
+    
+    setPauseAverageCents(avgCentsForPauseDisplay);
     return handleAddNote(noteScore, error);
-  }, [handleAddNote, OK_THRESHOLD]);
+  }, [handleAddNote, settings.trimTop, settings.tauMultiplier, settings.scoreExponentP, GOOD_THRESHOLD]);
 
   // Advance autoplay to the next note
   const advanceAutoplayNote = useCallback((noteError: number) => {
@@ -872,7 +911,7 @@ export default function ViolinTunerGame(): ReactNode {
         latestHoldProgressRef.current = Math.min(autoplayElapsed / HOLD_DURATION, 1);
         if (autoplayElapsed >= HOLD_DURATION) {
           const noteError = noteSamplesRef.current.length > 0 
-            ? averageAbsoluteCents(noteSamplesRef.current) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
+            ? trimmedMeanAbs(noteSamplesRef.current, settings.trimTop) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
             : 0;
           noteSamplesRef.current = [];
           noteAcceptedThisCycle = true;
@@ -984,7 +1023,7 @@ export default function ViolinTunerGame(): ReactNode {
         audioIntervalRef.current = null;
       }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
+  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, settings, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
 
   // Version checking - periodically check for updates when on menu screen
   useEffect(() => {
@@ -1485,6 +1524,116 @@ export default function ViolinTunerGame(): ReactNode {
               }} />
             </div>
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Long</span>
+          </div>
+        </div>
+
+        {/* Score Outlier Trim Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Trim worst samples</span>
+            <span style={{ color: '#94a3b8' }}>{Math.round(settings.trimTop * 100)}%</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Remove outlier samples from scoring (higher = more forgiving)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>0%</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.trimTop.min}
+                max={SETTINGS_RANGES.trimTop.max}
+                step={SETTINGS_RANGES.trimTop.step}
+                value={settings.trimTop}
+                onChange={(e) => updateSetting('trimTop', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.trimTop, SETTINGS_RANGES.trimTop.min, SETTINGS_RANGES.trimTop.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>40%</span>
+          </div>
+        </div>
+
+        {/* Score Curve Sharpness Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Curve shape (p)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.scoreExponentP.toFixed(2)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            How sharply scores drop with error (higher = steeper penalty)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Gentle</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.scoreExponentP.min}
+                max={SETTINGS_RANGES.scoreExponentP.max}
+                step={SETTINGS_RANGES.scoreExponentP.step}
+                value={settings.scoreExponentP}
+                onChange={(e) => updateSetting('scoreExponentP', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.scoreExponentP, SETTINGS_RANGES.scoreExponentP.min, SETTINGS_RANGES.scoreExponentP.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Sharp</span>
+          </div>
+        </div>
+
+        {/* Score Sensitivity Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Score tolerance (k×GOOD)</span>
+            <span style={{ color: '#94a3b8' }}>
+              k={settings.tauMultiplier.toFixed(1)} (τ={(settings.tauMultiplier * settings.okThreshold * 0.5).toFixed(1)}¢)
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Cents window for good scores (higher = more forgiving)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Strict</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.tauMultiplier.min}
+                max={SETTINGS_RANGES.tauMultiplier.max}
+                step={SETTINGS_RANGES.tauMultiplier.step}
+                value={settings.tauMultiplier}
+                onChange={(e) => updateSetting('tauMultiplier', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.tauMultiplier, SETTINGS_RANGES.tauMultiplier.min, SETTINGS_RANGES.tauMultiplier.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Forgiving</span>
           </div>
         </div>
 

@@ -18,7 +18,7 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 3. Collect accuracy samples when within `SAME_NOTE_THRESHOLD` (50¢)
 4. Practice mode: Advance when continuously within OK threshold for hold duration
 5. Test mode: Auto-advance after accumulating hold duration of in-range time
-6. Per-note score: `exp(-avg_abs_cents / OK_THRESHOLD)` normalized to 100 total
+6. Per-note score: Uses trimmed mean of absolute cents (E) with shaped curve `exp(-(E/tau)^p)` where tau = k × GOOD_THRESHOLD
 7. Tower collapses when instability ≥ collapse threshold × note count
 
 ## Settings System
@@ -31,6 +31,9 @@ Many game parameters are now **user-configurable** via a Settings screen. The `G
 - `enabledScales`: Which scales appear in the dropdown
 - `noCollapse`: Prevent tower from collapsing
 - `hideTunerWhenPlaying`: Hide pitch feedback during play
+- `trimTop`: Fraction of outlier samples to trim from scoring (0.0-0.4, default 0.2)
+- `scoreExponentP`: Curve sharpness parameter p (1.0-4.0, default 2)
+- `tauMultiplier`: Score tolerance multiplier k (1.0-3.0, default 1.8)
 
 Settings are stored in `localStorage` under key `scaleTowerSettings`. Default values are in `DEFAULT_SETTINGS`, and slider ranges are in `SETTINGS_RANGES`.
 
@@ -42,8 +45,16 @@ The only non-configurable constant is `GAME_CONFIG.SAME_NOTE_THRESHOLD` (50¢).
 
 **Accuracy**: `getCents(frequency, targetFrequency)` = `1200 * log₂(freq / target)`. Positive = sharp, negative = flat.
 
+**Scoring**: `trimmedMeanAbs(samples, trimTop)` — computes robust error statistic E by:
+1. Taking absolute value of all samples
+2. Sorting ascending
+3. Trimming top fraction (default 20%)
+4. Computing mean of remaining samples (always keeps at least 1)
+
+Per-note score: `exp(-(E/tau)^p)` where tau = k × GOOD_THRESHOLD, normalized to 100 total across scale.
+
 **Brick Behavior**:
-- Angle = `cents × 1.5`
+- Angle = `cents × 1.5` (uses signed error E × sign)
 - Color: `getColorFromError()` interpolates Green→Red (sharp) or Green→Blue (flat)
 
 **Scale System**: `SCALES` object defines note sequences. `getKeySignatureForScale()` maps to VexFlow key signatures.
