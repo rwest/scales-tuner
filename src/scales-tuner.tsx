@@ -75,7 +75,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   hideTunerWhenPlaying: false,
   trimTop: 0.2,
   scoreExponentP: 2,
-  tauMultiplier: 1.8,
+  tauMultiplier: 2.0,
 };
 
 // Settings ranges for sliders
@@ -85,7 +85,7 @@ const SETTINGS_RANGES = {
   holdDuration: { min: 400, max: 1100, step: 50 },     // short (400) to long (1200)
   pauseBetweenNotes: { min: 300, max: 900, step: 50 }, // short (300) to long (1000)
   trimTop: { min: 0.00, max: 0.40, step: 0.05 },       // outlier trim fraction
-  scoreExponentP: { min: 1.0, max: 4.0, step: 0.25 },  // curve sharpness
+  scoreExponentP: { min: 1.0, max: 3.0, step: 0.1 },  // curve sharpness
   tauMultiplier: { min: 1.0, max: 3.0, step: 0.1 },    // score sensitivity
 } as const;
 
