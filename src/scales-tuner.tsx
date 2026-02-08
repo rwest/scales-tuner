@@ -70,7 +70,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   collapseThreshold: 15,
   holdDuration: 750,
   pauseBetweenNotes: 600,
-  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A'],
+  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A', 'Minuet Measure'],
   noCollapse: false,
   hideTunerWhenPlaying: false,
   trimTop: 0.2,
@@ -164,6 +164,9 @@ const SCALES: ScalesType = {
   },
   'Tonalization 1A': {
     notes: ['G4', 'B4', 'D5', 'G5', 'A5', 'B5', 'A5', 'G5', 'D5', 'E5', 'D5', 'B4', 'G4'],
+  },
+  'Minuet Measure': {
+    notes: ['G4', 'D5', 'F#4', 'C5', 'G4', 'Bb4', 'A4'],
   },
 };
 
@@ -278,6 +281,7 @@ function getKeySignatureForScale(scaleName: string): string {
     'D Major': 'D',
     'D Minor Melodic': 'F', // D Melodic Minor has 1 flat
     'Tonalization 1A': 'G',
+    'Minuet Measure': 'Bb',
   };
   return keyMap[scaleName];
 }
