@@ -62,6 +62,8 @@ interface GameSettings {
   trimTop: number;              // fraction trimmed from top tail (0.0-0.4, default 0.2)
   scoreExponentP: number;       // p in exp(-(E/tau)^p) (1.0-4.0, default 2)
   tauMultiplier: number;        // k in tau = k*GOOD_THRESHOLD (1.0-3.0, default 1.8)
+  autoReplay: boolean;          // automatically restart after completion
+  autoReplayDelay: number;      // ms before auto-replay triggers (1000-5000, default 3000)
 }
 
 // Default settings (current values = middle of each range)
@@ -76,6 +78,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   trimTop: 0.2,
   scoreExponentP: 2,
   tauMultiplier: 2.0,
+  autoReplay: true,
+  autoReplayDelay: 3000,
 };
 
 // Settings ranges for sliders
@@ -87,6 +91,7 @@ const SETTINGS_RANGES = {
   trimTop: { min: 0.00, max: 0.40, step: 0.05 },       // outlier trim fraction
   scoreExponentP: { min: 1.0, max: 3.0, step: 0.1 },  // curve sharpness
   tauMultiplier: { min: 1.0, max: 3.0, step: 0.1 },    // score sensitivity
+  autoReplayDelay: { min: 1000, max: 5000, step: 500 },  // auto-replay delay
 } as const;
 
 const STORAGE_KEY = 'scaleTowerSettings';
@@ -693,7 +698,7 @@ export default function ViolinTunerGame(): ReactNode {
 
   // Auto-replay countdown after success
   useEffect(() => {
-    if (gameState !== 'success' && gameState !== 'collapsed') {
+    if ((gameState !== 'success' && gameState !== 'collapsed') || !settings.autoReplay) {
       setReplayProgress(0);
       replayStartRef.current = null;
       if (replayAnimRef.current !== null) {
@@ -702,7 +707,7 @@ export default function ViolinTunerGame(): ReactNode {
       }
       return;
     }
-    const REPLAY_DELAY = 2000;
+    const REPLAY_DELAY = settings.autoReplayDelay;
     replayStartRef.current = performance.now();
     const animate = (now: number) => {
       const elapsed = now - (replayStartRef.current ?? now);
@@ -723,7 +728,7 @@ export default function ViolinTunerGame(): ReactNode {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, settings.autoReplay, settings.autoReplayDelay]);
 
   const startGame = async (mode: GameMode) => {
     setError(null);
@@ -1218,6 +1223,19 @@ export default function ViolinTunerGame(): ReactNode {
             />
             Hide tuner when playing
           </label>
+          <label style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={settings.autoReplay}
+              onChange={(e) => {
+                const newSettings = { ...settings, autoReplay: e.target.checked };
+                setSettings(newSettings);
+                saveSettings(newSettings);
+              }}
+              style={{ width: 24, height: 24 }}
+            />
+            Auto-replay
+          </label>
           <button
             onClick={() => setGameState('settings')}
             style={{
@@ -1675,6 +1693,39 @@ export default function ViolinTunerGame(): ReactNode {
               }} />
             </div>
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Forgiving</span>
+          </div>
+        </div>
+
+        {/* Auto-replay delay */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Auto-replay Delay</span>
+            <span style={{ color: '#94a3b8' }}>{(settings.autoReplayDelay / 1000).toFixed(1)}s</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Short</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.autoReplayDelay.min}
+                max={SETTINGS_RANGES.autoReplayDelay.max}
+                step={SETTINGS_RANGES.autoReplayDelay.step}
+                value={settings.autoReplayDelay}
+                onChange={(e) => updateSetting('autoReplayDelay', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.autoReplayDelay, SETTINGS_RANGES.autoReplayDelay.min, SETTINGS_RANGES.autoReplayDelay.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Long</span>
           </div>
         </div>
 
