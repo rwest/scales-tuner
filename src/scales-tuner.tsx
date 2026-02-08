@@ -659,6 +659,8 @@ export default function ViolinTunerGame(): ReactNode {
   const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(settings.hideTunerWhenPlaying);
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
+  const [replayProgress, setReplayProgress] = useState<number>(0);
+  const replayAnimRef = useRef<number | null>(null);
 
   // Derived thresholds from settings
   const OK_THRESHOLD = settings.okThreshold;
@@ -679,6 +681,7 @@ export default function ViolinTunerGame(): ReactNode {
   const pauseStartTimeRef = useRef<number | null>(null);
   const autoplayNoteStartTimeRef = useRef<number | null>(null);
   const autoplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const replayStartRef = useRef<number | null>(null);
   // Refs for decoupled audio→visual updates (iOS Safari throttles rAF aggressively)
   const latestPitchRef = useRef<number | null>(null);
   const latestCentsRef = useRef<number>(0);
@@ -687,6 +690,40 @@ export default function ViolinTunerGame(): ReactNode {
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
   const targetFrequency = NOTE_FREQUENCIES[currentNote];
+
+  // Auto-replay countdown after success
+  useEffect(() => {
+    if (gameState !== 'success' && gameState !== 'collapsed') {
+      setReplayProgress(0);
+      replayStartRef.current = null;
+      if (replayAnimRef.current !== null) {
+        cancelAnimationFrame(replayAnimRef.current);
+        replayAnimRef.current = null;
+      }
+      return;
+    }
+    const REPLAY_DELAY = 2000;
+    replayStartRef.current = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - (replayStartRef.current ?? now);
+      const progress = Math.min(elapsed / REPLAY_DELAY, 1);
+      setReplayProgress(progress);
+      if (progress < 1) {
+        replayAnimRef.current = requestAnimationFrame(animate);
+      } else {
+        replayAnimRef.current = null;
+        void startGame(gameMode);
+      }
+    };
+    replayAnimRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (replayAnimRef.current !== null) {
+        cancelAnimationFrame(replayAnimRef.current);
+        replayAnimRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
   const startGame = async (mode: GameMode) => {
     setError(null);
@@ -1958,9 +1995,11 @@ export default function ViolinTunerGame(): ReactNode {
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
-                background: '#f87171',
+                background: `linear-gradient(to right, #f87171 ${replayProgress * 100}%, #475569 ${replayProgress * 100}%)`,
                 color: '#fff',
                 cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
               Try Again
@@ -2010,9 +2049,11 @@ export default function ViolinTunerGame(): ReactNode {
                 fontSize: 16,
                 borderRadius: 8,
                 border: 'none',
-                background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)',
+                background: `linear-gradient(to right, #22c55e ${replayProgress * 100}%, #475569 ${replayProgress * 100}%)`,
                 color: '#fff',
                 cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
               Play Again
