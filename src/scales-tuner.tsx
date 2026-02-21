@@ -85,11 +85,11 @@ const DEFAULT_SETTINGS: GameSettings = {
   trimTop: 0.2,
   scoreExponentP: 2,
   tauMultiplier: 1.8,
-  basePointsPerNote: 1000,
+  basePointsPerNote: 50,
   bonusTauMultiplier: 1.0,
   bonusEpsilonCents: 1.5,
   bonusExponentQ: 1.0,
-  bonusWeight: 200,
+  bonusWeight: 10,
   autoReplay: true,
   autoReplayDelay: 3000,
 };
@@ -103,8 +103,8 @@ const SETTINGS_RANGES = {
   trimTop: { min: 0.00, max: 0.40, step: 0.05 },       // outlier trim fraction
   scoreExponentP: { min: 1.0, max: 4.0, step: 0.25 },  // curve sharpness
   tauMultiplier: { min: 1.0, max: 3.0, step: 0.1 },    // score sensitivity
-  basePointsPerNote: { min: 200, max: 3000, step: 100 }, // base points per note
-  bonusWeight: { min: 0, max: 1000, step: 50 },         // bonus weight (0 disables)
+  basePointsPerNote: { min: 10, max: 150, step: 5 },     // base points per note
+  bonusWeight: { min: 0, max: 50, step: 5 },              // bonus weight (0 disables)
   bonusTauMultiplier: { min: 0.5, max: 3.0, step: 0.1 }, // bonus tau multiplier
   bonusEpsilonCents: { min: 0.5, max: 5.0, step: 0.25 }, // bonus epsilon
   bonusExponentQ: { min: 0.5, max: 2.0, step: 0.1 },    // bonus exponent q
