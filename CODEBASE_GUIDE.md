@@ -145,17 +145,21 @@ playing → (success | collapsed) → menu
 - **Robust Error Statistic**: Uses trimmed mean of absolute cents (E) to reduce impact of outliers
   - By default, trims top 20% of worst samples
   - Always keeps at least 1 sample to avoid edge cases
-- **Shaped Curve**: `noteScore = exp(-(E/tau)^p)` where:
-  - `tau = k × GOOD_THRESHOLD` (τ determines the cents window for good scores)
-  - `p` controls curve sharpness (default 2)
-  - `k` is a multiplier (default 1.8)
+- **Two-part scoring** per note: `pts = A × exp(-(E/τ_acc)^p) + B × log(1 + (τ_bonus/(E+ε))^q)`
+  - **Accuracy term** (bounded): `A × exp(-(E/τ_acc)^p)` where `τ_acc = k × GOOD_THRESHOLD`
+  - **Precision bonus** (unbounded, diminishing returns): `B × log(1 + (τ_bonus/(E+ε))^q)`
   - `GOOD_THRESHOLD = OK_THRESHOLD × 0.5`
 - **Configurable parameters** in Settings:
   - `trimTop`: Fraction of outliers to trim (0.0-0.4, default 0.2)
-  - `scoreExponentP`: Curve sharpness (1.0-4.0, default 2)
-  - `tauMultiplier`: Score tolerance multiplier (1.0-3.0, default 1.8)
-- Normalized to 100 points total across the scale
-- **Design Goal**: Players who consistently stay in the "GOOD" range should achieve scores around 95-100
+  - `scoreExponentP` (p): Curve sharpness (1.0-4.0, default 2)
+  - `tauMultiplier` (k): Score tolerance multiplier (1.0-3.0, default 1.8)
+  - `basePointsPerNote` (A): Base accuracy points per note (200-3000, default 1000)
+  - `bonusWeight` (B): Precision bonus weight (0-1000, default 200, 0 disables)
+  - `bonusTauMultiplier`: Bonus tau multiplier (0.5-3.0, default 1.0)
+  - `bonusEpsilonCents` (ε): Stability constant (0.5-5.0, default 1.5)
+  - `bonusExponentQ` (q): Bonus curve exponent (0.5-2.0, default 1.0)
+- Total score is the **sum** of per-note points (unbounded integer)
+- **Design Goal**: Good midrange discrimination (5-20¢) with headroom for experts near 0¢
 
 ### Instability & Tower
 - Each brick adds `abs(angle)` to instability (angle = cents × 1.5)

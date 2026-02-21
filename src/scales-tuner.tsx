@@ -60,8 +60,15 @@ interface GameSettings {
   noCollapse: boolean;          // prevent tower from collapsing
   hideTunerWhenPlaying: boolean; // hide pitch feedback while playing notes
   trimTop: number;              // fraction trimmed from top tail (0.0-0.4, default 0.2)
+  // accuracy term parameters
   scoreExponentP: number;       // p in exp(-(E/tau)^p) (1.0-4.0, default 2)
   tauMultiplier: number;        // k in tau = k*GOOD_THRESHOLD (1.0-3.0, default 1.8)
+  basePointsPerNote: number;    // A, base points per note (200-3000, default 1000)
+  // bonus term parameters (log-reciprocal)
+  bonusTauMultiplier: number;   // bonus tau = k_b * GOOD (0.5-3.0, default 1.0)
+  bonusEpsilonCents: number;    // eps stabiliser in cents (0.5-5.0, default 1.5)
+  bonusExponentQ: number;       // q exponent (0.5-2.0, default 1.0)
+  bonusWeight: number;          // B, bonus weight (0-1000, default 200, 0 disables)
   autoReplay: boolean;          // automatically restart after completion
   autoReplayDelay: number;      // ms before auto-replay triggers (1000-5000, default 3000)
 }
@@ -77,7 +84,12 @@ const DEFAULT_SETTINGS: GameSettings = {
   hideTunerWhenPlaying: false,
   trimTop: 0.2,
   scoreExponentP: 2,
-  tauMultiplier: 2.0,
+  tauMultiplier: 1.8,
+  basePointsPerNote: 1000,
+  bonusTauMultiplier: 1.0,
+  bonusEpsilonCents: 1.5,
+  bonusExponentQ: 1.0,
+  bonusWeight: 200,
   autoReplay: true,
   autoReplayDelay: 3000,
 };
@@ -89,8 +101,13 @@ const SETTINGS_RANGES = {
   holdDuration: { min: 400, max: 1100, step: 50 },     // short (400) to long (1200)
   pauseBetweenNotes: { min: 300, max: 900, step: 50 }, // short (300) to long (1000)
   trimTop: { min: 0.00, max: 0.40, step: 0.05 },       // outlier trim fraction
-  scoreExponentP: { min: 1.0, max: 3.0, step: 0.1 },  // curve sharpness
+  scoreExponentP: { min: 1.0, max: 4.0, step: 0.25 },  // curve sharpness
   tauMultiplier: { min: 1.0, max: 3.0, step: 0.1 },    // score sensitivity
+  basePointsPerNote: { min: 200, max: 3000, step: 100 }, // base points per note
+  bonusWeight: { min: 0, max: 1000, step: 50 },         // bonus weight (0 disables)
+  bonusTauMultiplier: { min: 0.5, max: 3.0, step: 0.1 }, // bonus tau multiplier
+  bonusEpsilonCents: { min: 0.5, max: 5.0, step: 0.25 }, // bonus epsilon
+  bonusExponentQ: { min: 0.5, max: 2.0, step: 0.1 },    // bonus exponent q
   autoReplayDelay: { min: 1000, max: 5000, step: 500 },  // auto-replay delay
 } as const;
 
@@ -273,6 +290,28 @@ function trimmedMeanAbs(samples: number[], trimTop: number): number {
   const trimmed = abs.slice(0, keepCount);
   
   return trimmed.reduce((sum, val) => sum + val, 0) / trimmed.length;
+}
+
+// Two-part per-note scoring: bounded accuracy + unbounded precision bonus
+function notePointsFromE(E: number, GOOD: number, settings: {
+  tauMultiplier: number;
+  scoreExponentP: number;
+  basePointsPerNote: number;
+  bonusTauMultiplier: number;
+  bonusEpsilonCents: number;
+  bonusExponentQ: number;
+  bonusWeight: number;
+}): number {
+  // accuracy term (bounded 0–A)
+  const tauAcc = settings.tauMultiplier * GOOD;
+  const s = Math.exp(-Math.pow(E / tauAcc, settings.scoreExponentP));
+
+  // bonus term (log-reciprocal, unbounded, diminishing returns)
+  const tauBonus = settings.bonusTauMultiplier * GOOD;
+  const eps = settings.bonusEpsilonCents;
+  const b = Math.log(1 + Math.pow(tauBonus / (E + eps), settings.bonusExponentQ));
+
+  return settings.basePointsPerNote * s + settings.bonusWeight * b;
 }
 
 // Map scale names to VexFlow key signatures
@@ -811,7 +850,7 @@ export default function ViolinTunerGame(): ReactNode {
   }, []);
 
   // Shared handler for adding a finished note (used by live and autoplay flows)
-  const handleAddNote = useCallback((noteScore: number, error: number): boolean => {
+  const handleAddNote = useCallback((notePoints: number, error: number): boolean => {
     const angle = getAngleFromError(error);
     const color = getColorFromError(error);
 
@@ -822,11 +861,10 @@ export default function ViolinTunerGame(): ReactNode {
     setInstability(newInstability);
 
     setNoteScores(prev => {
-      const newScores = [...prev, noteScore];
-      const total = newScores.reduce((a, b) => a + b, 0);
-      const normalizedScore = Math.round((total / scale.notes.length) * 100);
-      setScore(normalizedScore);
-      return newScores;
+      const arr = [...prev, notePoints];
+      const totalPoints = Math.round(arr.reduce((a, b) => a + b, 0));
+      setScore(totalPoints);
+      return arr;
     });
 
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
@@ -856,37 +894,47 @@ export default function ViolinTunerGame(): ReactNode {
 
   // Helper to accept a completed note (shared between practice and test modes)
   const acceptNote = useCallback(() => {
-    // Use trimmed mean of absolute cents for robust error statistic
+    const GOOD = GOOD_THRESHOLD;
     const E = trimmedMeanAbs(noteSamplesRef.current, settings.trimTop);
-    
-    // Calculate tau and new score mapping
-    const tau = settings.tauMultiplier * GOOD_THRESHOLD;
-    const p = settings.scoreExponentP;
-    const noteScore = Math.exp(-Math.pow(E / tau, p));
-    
-    // Calculate signed error for visuals (brick angle/color)
+
+    // Keep sign logic for visuals (brick angle/color)
     const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
-    const sign = bias > 0 ? 1 : -1;
-    const error = E * sign;
-    const avgCentsForPauseDisplay = E * sign;
-    
+    const signedError = E * (bias > 0 ? 1 : -1);
+
+    // Show signed typical cents during pause
+    setPauseAverageCents(signedError);
+
+    // Compute points for this note (two-part: accuracy + bonus)
+    const pts = notePointsFromE(E, GOOD, {
+      tauMultiplier: settings.tauMultiplier,
+      scoreExponentP: settings.scoreExponentP,
+      basePointsPerNote: settings.basePointsPerNote,
+      bonusTauMultiplier: settings.bonusTauMultiplier,
+      bonusEpsilonCents: settings.bonusEpsilonCents,
+      bonusExponentQ: settings.bonusExponentQ,
+      bonusWeight: settings.bonusWeight,
+    });
+
     // Debug logging for calibration (dev only)
     if (import.meta.env.DEV) {
+      const tauAcc = settings.tauMultiplier * GOOD;
+      const tauBonus = settings.bonusTauMultiplier * GOOD;
+      const accTerm = settings.basePointsPerNote * Math.exp(-Math.pow(E / tauAcc, settings.scoreExponentP));
+      const bonusTerm = settings.bonusWeight * Math.log(1 + Math.pow(tauBonus / (E + settings.bonusEpsilonCents), settings.bonusExponentQ));
       console.log('[Score Debug]', {
         sampleCount: noteSamplesRef.current.length,
         E: E.toFixed(2),
-        tau: tau.toFixed(2),
-        p: p,
-        k: settings.tauMultiplier,
-        trimTop: settings.trimTop,
-        noteScore: noteScore.toFixed(4),
-        error: error.toFixed(2),
+        tauAcc: tauAcc.toFixed(2),
+        tauBonus: tauBonus.toFixed(2),
+        accuracy: accTerm.toFixed(1),
+        bonus: bonusTerm.toFixed(1),
+        pts: pts.toFixed(1),
+        signedError: signedError.toFixed(2),
       });
     }
-    
-    setPauseAverageCents(avgCentsForPauseDisplay);
-    return handleAddNote(noteScore, error);
-  }, [handleAddNote, settings.trimTop, settings.tauMultiplier, settings.scoreExponentP, GOOD_THRESHOLD]);
+
+    return handleAddNote(pts, signedError);
+  }, [handleAddNote, settings, GOOD_THRESHOLD]);
 
   // Advance autoplay to the next note
   const advanceAutoplayNote = useCallback((noteError: number) => {
@@ -1693,6 +1741,186 @@ export default function ViolinTunerGame(): ReactNode {
               }} />
             </div>
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Forgiving</span>
+          </div>
+        </div>
+
+        {/* Base Points Per Note Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Base pts / note (A)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.basePointsPerNote}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Max accuracy points per note (bounded term)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Low</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.basePointsPerNote.min}
+                max={SETTINGS_RANGES.basePointsPerNote.max}
+                step={SETTINGS_RANGES.basePointsPerNote.step}
+                value={settings.basePointsPerNote}
+                onChange={(e) => updateSetting('basePointsPerNote', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.basePointsPerNote, SETTINGS_RANGES.basePointsPerNote.min, SETTINGS_RANGES.basePointsPerNote.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>High</span>
+          </div>
+        </div>
+
+        {/* Bonus Weight Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Bonus weight (B)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.bonusWeight}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Extra points for precision (0 = disabled)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Off</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.bonusWeight.min}
+                max={SETTINGS_RANGES.bonusWeight.max}
+                step={SETTINGS_RANGES.bonusWeight.step}
+                value={settings.bonusWeight}
+                onChange={(e) => updateSetting('bonusWeight', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.bonusWeight, SETTINGS_RANGES.bonusWeight.min, SETTINGS_RANGES.bonusWeight.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>High</span>
+          </div>
+        </div>
+
+        {/* Bonus Tau Multiplier Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Bonus tau (k_b×GOOD)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.bonusTauMultiplier.toFixed(1)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Scale of precision bonus (higher = more bonus at moderate error)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Low</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.bonusTauMultiplier.min}
+                max={SETTINGS_RANGES.bonusTauMultiplier.max}
+                step={SETTINGS_RANGES.bonusTauMultiplier.step}
+                value={settings.bonusTauMultiplier}
+                onChange={(e) => updateSetting('bonusTauMultiplier', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.bonusTauMultiplier, SETTINGS_RANGES.bonusTauMultiplier.min, SETTINGS_RANGES.bonusTauMultiplier.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>High</span>
+          </div>
+        </div>
+
+        {/* Bonus Epsilon Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Bonus epsilon (ε)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.bonusEpsilonCents.toFixed(2)}¢</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Stabiliser prevents infinite bonus at zero error
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Tight</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.bonusEpsilonCents.min}
+                max={SETTINGS_RANGES.bonusEpsilonCents.max}
+                step={SETTINGS_RANGES.bonusEpsilonCents.step}
+                value={settings.bonusEpsilonCents}
+                onChange={(e) => updateSetting('bonusEpsilonCents', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.bonusEpsilonCents, SETTINGS_RANGES.bonusEpsilonCents.min, SETTINGS_RANGES.bonusEpsilonCents.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Loose</span>
+          </div>
+        </div>
+
+        {/* Bonus Exponent Q Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Bonus exponent (q)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.bonusExponentQ.toFixed(1)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Shape of precision bonus curve
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Gentle</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.bonusExponentQ.min}
+                max={SETTINGS_RANGES.bonusExponentQ.max}
+                step={SETTINGS_RANGES.bonusExponentQ.step}
+                value={settings.bonusExponentQ}
+                onChange={(e) => updateSetting('bonusExponentQ', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.bonusExponentQ, SETTINGS_RANGES.bonusExponentQ.min, SETTINGS_RANGES.bonusExponentQ.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Sharp</span>
           </div>
         </div>
 
