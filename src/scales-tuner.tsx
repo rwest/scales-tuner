@@ -696,6 +696,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [replayProgress, setReplayProgress] = useState<number>(0);
+  const [showAdvancedScoring, setShowAdvancedScoring] = useState<boolean>(false);
   const replayAnimRef = useRef<number | null>(null);
 
   // Derived thresholds from settings
@@ -1618,6 +1619,32 @@ export default function ViolinTunerGame(): ReactNode {
           </div>
         </div>
 
+        {/* Advanced Scoring Section */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <button
+            onClick={() => setShowAdvancedScoring(prev => !prev)}
+            style={{
+              width: '100%',
+              padding: '10px 0',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid #334155',
+              borderRadius: 8,
+              color: '#94a3b8',
+              fontSize: 14,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ transform: showAdvancedScoring ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▶</span>
+            Advanced Scoring
+          </button>
+        </div>
+
+        {showAdvancedScoring && (<>
+
         {/* Score Outlier Trim Slider */}
         <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
           <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -1907,6 +1934,8 @@ export default function ViolinTunerGame(): ReactNode {
             <span style={{ color: '#94a3b8', fontSize: 12 }}>Sharp</span>
           </div>
         </div>
+
+        </>)}
 
         {/* Auto-replay delay */}
         <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
