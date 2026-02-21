@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   collapseThreshold: 15,
   holdDuration: 750,
   pauseBetweenNotes: 600,
-  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A', 'Minuet Measure'],
+  enabledScales: ['G Major', 'G Minor Melodic', 'Bb Major', 'A Major', 'A Minor Melodic', 'D Major', 'D Minor Melodic', 'Tonalization 1A'],
   noCollapse: false,
   hideTunerWhenPlaying: false,
   trimTop: 0.2,
