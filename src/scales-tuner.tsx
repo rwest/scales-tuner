@@ -293,15 +293,7 @@ function trimmedMeanAbs(samples: number[], trimTop: number): number {
 }
 
 // Two-part per-note scoring: bounded accuracy + unbounded precision bonus
-function notePointsFromE(E: number, GOOD: number, settings: {
-  tauMultiplier: number;
-  scoreExponentP: number;
-  basePointsPerNote: number;
-  bonusTauMultiplier: number;
-  bonusEpsilonCents: number;
-  bonusExponentQ: number;
-  bonusWeight: number;
-}): number {
+function notePointsFromE(E: number, GOOD: number, settings: GameSettings): number {
   // accuracy term (bounded 0–A)
   const tauAcc = settings.tauMultiplier * GOOD;
   const s = Math.exp(-Math.pow(E / tauAcc, settings.scoreExponentP));
@@ -905,15 +897,7 @@ export default function ViolinTunerGame(): ReactNode {
     setPauseAverageCents(signedError);
 
     // Compute points for this note (two-part: accuracy + bonus)
-    const pts = notePointsFromE(E, GOOD, {
-      tauMultiplier: settings.tauMultiplier,
-      scoreExponentP: settings.scoreExponentP,
-      basePointsPerNote: settings.basePointsPerNote,
-      bonusTauMultiplier: settings.bonusTauMultiplier,
-      bonusEpsilonCents: settings.bonusEpsilonCents,
-      bonusExponentQ: settings.bonusExponentQ,
-      bonusWeight: settings.bonusWeight,
-    });
+    const pts = notePointsFromE(E, GOOD, settings);
 
     // Debug logging for calibration (dev only)
     if (import.meta.env.DEV) {
