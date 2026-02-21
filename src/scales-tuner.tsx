@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import Vex from 'vexflow';
 
 // Type definitions
@@ -23,6 +23,7 @@ interface Brick {
   angle: number;  // calculated rotation angle
   color: string;  // calculated color based on error
   note?: string;  // note name for display
+  points?: number; // points earned for this note
 }
 
 interface TuningIndicator {
@@ -43,6 +44,7 @@ interface BrickProps {
   opacity?: number;
   cumulativeError?: number;
   note?: string;
+  points?: number;
 }
 
 interface FallingBrickProps {
@@ -847,7 +849,7 @@ export default function ViolinTunerGame(): ReactNode {
     const angle = getAngleFromError(error);
     const color = getColorFromError(error);
 
-    const newBrick = { index: bricks.length, error, angle, color, note: currentNote };
+    const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints };
     const newInstability = instability + Math.abs(angle);
 
     setBricks(prev => [...prev, newBrick]);
@@ -2232,16 +2234,42 @@ export default function ViolinTunerGame(): ReactNode {
           ) : (
             bricks.map((brick, i) => {
               const cumulativeError = bricks.slice(0, i).reduce((sum, b) => sum + b.error, 0);
+              const brickHeight = 16;
+              const brickY = i * (brickHeight + 2);
+              const pts = brick.points;
+              const pointsFontSize = pts && pts > 0 ? Math.max(8, Math.min(20, 4 * Math.log(pts + 1))) : 0;
               return (
-                <Brick
-                  key={i}
-                  index={brick.index}
-                  angle={brick.angle}
-                  color={brick.color}
-                  isLatest={i === bricks.length - 1}
-                  cumulativeError={cumulativeError}
-                  note={brick.note}
-                />
+                <React.Fragment key={i}>
+                  <Brick
+                    index={brick.index}
+                    angle={brick.angle}
+                    color={brick.color}
+                    isLatest={i === bricks.length - 1}
+                    cumulativeError={cumulativeError}
+                    note={brick.note}
+                  />
+                  {pts !== undefined && pts > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: brickY,
+                      right: -4,
+                      height: brickHeight,
+                      display: 'flex',
+                      alignItems: 'center',
+                      pointerEvents: 'none',
+                    }}>
+                      <span style={{
+                        fontSize: pointsFontSize,
+                        color: brick.color,
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                      }}>
+                        {Math.round(pts)}
+                      </span>
+                    </div>
+                  )}
+                </React.Fragment>
               );
             })
           )}
