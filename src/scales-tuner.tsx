@@ -23,7 +23,8 @@ interface Brick {
   angle: number;  // calculated rotation angle
   color: string;  // calculated color based on error
   note?: string;  // note name for display
-  points?: number; // points earned for this note
+  points?: number; // points earned for this note (after multiplier)
+  basePoints?: number; // points before multiplier
   multiplier?: number; // streak multiplier (1, 2, 4, or 8)
 }
 
@@ -856,11 +857,11 @@ export default function ViolinTunerGame(): ReactNode {
   }, []);
 
   // Shared handler for adding a finished note (used by live and autoplay flows)
-  const handleAddNote = useCallback((notePoints: number, error: number, multiplier?: number): boolean => {
+  const handleAddNote = useCallback((notePoints: number, error: number, multiplier?: number, basePoints?: number): boolean => {
     const angle = getAngleFromError(error);
     const color = getColorFromError(error);
 
-    const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints, multiplier };
+    const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints, basePoints, multiplier };
     const newInstability = instability + Math.abs(angle);
 
     setBricks(prev => [...prev, newBrick]);
@@ -947,7 +948,7 @@ export default function ViolinTunerGame(): ReactNode {
       });
     }
 
-    return handleAddNote(pts, signedError, multiplier > 1 ? multiplier : undefined);
+    return handleAddNote(pts, signedError, multiplier > 1 ? multiplier : undefined, basePts);
   }, [handleAddNote, settings, GOOD_THRESHOLD, OK_THRESHOLD]);
 
   // Advance autoplay to the next note
@@ -2308,6 +2309,7 @@ export default function ViolinTunerGame(): ReactNode {
               const brickHeight = 16;
               const brickY = i * (brickHeight + 2);
               const pts = brick.points;
+              const displayPts = brick.basePoints ?? pts;
               const pointsFontSize = pts && pts > 0 ? Math.max(8, Math.min(20, 4 * Math.log(pts + 1))) : 0;
               return (
                 <React.Fragment key={i}>
@@ -2340,7 +2342,7 @@ export default function ViolinTunerGame(): ReactNode {
                         fontWeight: 'bold',
                         textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                       }}>
-                        {Math.round(pts)}
+                        {Math.round(displayPts!)}
                       </span>
                       {brick.multiplier && brick.multiplier > 1 && (
                         <span style={{
