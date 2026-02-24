@@ -152,6 +152,14 @@ const GAME_CONFIG = {
   SAME_NOTE_THRESHOLD: 50,      // cents ±to recognize same target note
 } as const;
 
+// Streak multiplier tiers and colors (ordered highest-first for matching)
+const MULTIPLIER_TIERS = [
+  { streak: 15, multiplier: 8, color: '#af9ef6' },
+  { streak: 10, multiplier: 4, color: '#63cef8' },
+  { streak:  5, multiplier: 2, color: '#facc15' },
+] as const;
+const MULTIPLIER_DEFAULT_COLOR = '#22e55f'; // green (no multiplier)
+
 // Note frequencies for all scales (2 octaves)
 const NOTE_FREQUENCIES: NoteFrequencies = {
   'G3': 196.00, 'A3': 220.00, 'B3': 246.94, 'C4': 261.63, 'D4': 293.66,
@@ -905,12 +913,11 @@ export default function ViolinTunerGame(): ReactNode {
     // Compute points for this note (two-part: accuracy + bonus)
     const basePts = notePointsFromE(E, GOOD, settings);
 
-    // Streak multiplier: 5+ OK in a row = 2x, 10+ = 4x, 15+ = 8x
+    // Streak multiplier from tiers
     const isOk = E < OK_THRESHOLD;
     const oldStreak = goodStreakRef.current;
-    const multiplier = isOk
-      ? (oldStreak >= 15 ? 8 : oldStreak >= 10 ? 4 : oldStreak >= 5 ? 2 : 1)
-      : 1;
+    const tier = isOk ? MULTIPLIER_TIERS.find(t => oldStreak >= t.streak) : undefined;
+    const multiplier = tier ? tier.multiplier : 1;
     const pts = basePts * multiplier;
 
     if (isOk) {
@@ -941,7 +948,7 @@ export default function ViolinTunerGame(): ReactNode {
     }
 
     return handleAddNote(pts, signedError, multiplier > 1 ? multiplier : undefined);
-  }, [handleAddNote, settings, GOOD_THRESHOLD]);
+  }, [handleAddNote, settings, GOOD_THRESHOLD, OK_THRESHOLD]);
 
   // Advance autoplay to the next note
   const advanceAutoplayNote = useCallback((noteError: number) => {
@@ -2162,21 +2169,28 @@ export default function ViolinTunerGame(): ReactNode {
             </div>
 
             {/* Hold progress bar */}
-            <div style={{
-              width: 150,
-              height: 8,
-              background: 'rgba(255,255,255,0.2)',
-              borderRadius: 4,
-              marginTop: 8,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${holdProgress * 100}%`,
-                height: '100%',
-                background: ((hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : (gameMode === 'test' ? '#ffffff' : (isAutoplayMode ? '#a78bfa' : '#22e55f'))),
-                transition: 'width 0.05s ease-out',
-              }} />
-            </div>
+            {(() => {
+              const streakTier = MULTIPLIER_TIERS.find(t => goodStreakRef.current >= t.streak);
+              const streakColor = streakTier ? streakTier.color : MULTIPLIER_DEFAULT_COLOR;
+              const barColor = (hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : streakColor;
+              return (
+                <div style={{
+                  width: 150,
+                  height: 8,
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: 4,
+                  marginTop: 8,
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${holdProgress * 100}%`,
+                    height: '100%',
+                    background: barColor,
+                    transition: 'width 0.05s ease-out',
+                  }} />
+                </div>
+              );
+            })()}
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
               {isAutoplayMode ? 'Autoplay...' : (gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...')}
             </div>
@@ -2294,7 +2308,7 @@ export default function ViolinTunerGame(): ReactNode {
                       {brick.multiplier && brick.multiplier > 1 && (
                         <span style={{
                           fontSize: pointsFontSize * 0.85,
-                          color: brick.multiplier >= 8 ? '#c4b5fd' : brick.multiplier >= 4 ? '#ffffff' : '#facc15',
+                          color: (MULTIPLIER_TIERS.find(t => t.multiplier === brick.multiplier) || MULTIPLIER_TIERS[MULTIPLIER_TIERS.length - 1]).color,
                           fontWeight: 'bold',
                           textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                           marginLeft: 2,
