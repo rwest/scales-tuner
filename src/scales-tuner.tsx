@@ -24,6 +24,7 @@ interface Brick {
   color: string;  // calculated color based on error
   note?: string;  // note name for display
   points?: number; // points earned for this note
+  multiplier?: number; // streak multiplier (1, 2, 4, or 8)
 }
 
 interface TuningIndicator {
@@ -717,6 +718,7 @@ export default function ViolinTunerGame(): ReactNode {
   const noteStartTimeRef = useRef<number | null>(null);
   const accumulatedInRangeRef = useRef<number>(0);
   const noteSamplesRef = useRef<number[]>([]);
+  const goodStreakRef = useRef<number>(0);
   const pauseStartTimeRef = useRef<number | null>(null);
   const autoplayNoteStartTimeRef = useRef<number | null>(null);
   const autoplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -798,6 +800,7 @@ export default function ViolinTunerGame(): ReactNode {
       noteStartTimeRef.current = null;
       accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
+      goodStreakRef.current = 0;
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
       console.error(err);
@@ -845,11 +848,11 @@ export default function ViolinTunerGame(): ReactNode {
   }, []);
 
   // Shared handler for adding a finished note (used by live and autoplay flows)
-  const handleAddNote = useCallback((notePoints: number, error: number): boolean => {
+  const handleAddNote = useCallback((notePoints: number, error: number, multiplier?: number): boolean => {
     const angle = getAngleFromError(error);
     const color = getColorFromError(error);
 
-    const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints };
+    const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints, multiplier };
     const newInstability = instability + Math.abs(angle);
 
     setBricks(prev => [...prev, newBrick]);
@@ -900,7 +903,21 @@ export default function ViolinTunerGame(): ReactNode {
     setPauseAverageCents(signedError);
 
     // Compute points for this note (two-part: accuracy + bonus)
-    const pts = notePointsFromE(E, GOOD, settings);
+    const basePts = notePointsFromE(E, GOOD, settings);
+
+    // Streak multiplier: 5+ OK in a row = 2x, 10+ = 4x, 15+ = 8x
+    const isOk = E < OK_THRESHOLD;
+    const oldStreak = goodStreakRef.current;
+    const multiplier = isOk
+      ? (oldStreak >= 15 ? 8 : oldStreak >= 10 ? 4 : oldStreak >= 5 ? 2 : 1)
+      : 1;
+    const pts = basePts * multiplier;
+
+    if (isOk) {
+      goodStreakRef.current = oldStreak + 1;
+    } else {
+      goodStreakRef.current = 0;
+    }
 
     // Debug logging for calibration (dev only)
     if (import.meta.env.DEV) {
@@ -915,12 +932,15 @@ export default function ViolinTunerGame(): ReactNode {
         tauBonus: tauBonus.toFixed(2),
         accuracy: accTerm.toFixed(1),
         bonus: bonusTerm.toFixed(1),
+        basePts: basePts.toFixed(1),
+        multiplier,
+        streak: goodStreakRef.current,
         pts: pts.toFixed(1),
         signedError: signedError.toFixed(2),
       });
     }
 
-    return handleAddNote(pts, signedError);
+    return handleAddNote(pts, signedError, multiplier > 1 ? multiplier : undefined);
   }, [handleAddNote, settings, GOOD_THRESHOLD]);
 
   // Advance autoplay to the next note
@@ -2252,21 +2272,36 @@ export default function ViolinTunerGame(): ReactNode {
                     <div style={{
                       position: 'absolute',
                       bottom: brickY,
-                      right: -4,
+                      left: '100%',
+                      marginLeft: -4,
                       height: brickHeight,
                       display: 'flex',
                       alignItems: 'center',
                       pointerEvents: 'none',
+                      whiteSpace: 'nowrap',
                     }}>
                       <span style={{
+                        display: 'inline-block',
+                        minWidth: 28,
+                        textAlign: 'right',
                         fontSize: pointsFontSize,
                         color: brick.color,
                         fontWeight: 'bold',
-                        whiteSpace: 'nowrap',
                         textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                       }}>
                         {Math.round(pts)}
                       </span>
+                      {brick.multiplier && brick.multiplier > 1 && (
+                        <span style={{
+                          fontSize: pointsFontSize * 0.85,
+                          color: brick.multiplier >= 8 ? '#c4b5fd' : brick.multiplier >= 4 ? '#ffffff' : '#facc15',
+                          fontWeight: 'bold',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                          marginLeft: 2,
+                        }}>
+                          x{brick.multiplier}
+                        </span>
+                      )}
                     </div>
                   )}
                 </React.Fragment>
