@@ -2101,6 +2101,43 @@ export default function ViolinTunerGame(): ReactNode {
         <div style={{ color: '#22e55f', fontSize: 20, fontWeight: 'bold', marginTop: 4 }}>
           Score: {score}
         </div>
+        {/* Streak pips */}
+        {gameState === 'playing' && (() => {
+          const streak = goodStreakRef.current;
+          const maxPips = MULTIPLIER_TIERS[0].streak; // 15
+          // Build tier color map: pip index → color (tiers are highest-first, so iterate reversed)
+          const sortedTiers = [...MULTIPLIER_TIERS].reverse(); // lowest-first: 5, 10, 15
+          const pipColors: string[] = [];
+          for (let i = 0; i < maxPips; i++) {
+            const tier = sortedTiers.find(t => i < t.streak);
+            pipColors.push(tier ? tier.color : sortedTiers[sortedTiers.length - 1].color);
+          }
+          const activeTier = MULTIPLIER_TIERS.find(t => streak >= t.streak);
+          return (
+            <div style={{ display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'center', marginTop: 4 }}>
+              <span style={{ fontSize: 11, color: '#878c94', marginRight: 2 }}>Streak:</span>
+              {pipColors.map((color, i) => (
+                <div key={i} style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  border: `1.5px solid ${color}`,
+                  background: i < streak ? color : 'transparent',
+                  opacity: i < streak ? 1 : 0.4,
+                  transition: 'background 0.15s, opacity 0.15s',
+                }} />
+              ))}
+              <span style={{
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  color: activeTier ? activeTier.color : '#878c94',
+                  marginLeft: 2,
+                }}>
+                  x{activeTier ? activeTier.multiplier : 1}
+                </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Current note display */}
