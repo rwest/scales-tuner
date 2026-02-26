@@ -739,9 +739,10 @@ export default function ViolinTunerGame(): ReactNode {
   const autoplayNoteStartTimeRef = useRef<number | null>(null);
   const autoplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const replayStartRef = useRef<number | null>(null);
-  // Fluency tracking refs: count in-tune vs total audio samples during inter-note pauses
+  // Fluency tracking refs: count in-tune vs total audio samples across the whole scale
   const fluencyInTuneSamplesRef = useRef<number>(0);
   const fluencyTotalSamplesRef = useRef<number>(0);
+  const fluencyStartedRef = useRef<boolean>(false);
   // Refs for decoupled audio→visual updates (iOS Safari throttles rAF aggressively)
   const latestPitchRef = useRef<number | null>(null);
   const latestCentsRef = useRef<number>(0);
@@ -823,6 +824,7 @@ export default function ViolinTunerGame(): ReactNode {
       goodStreakRef.current = 0;
       fluencyInTuneSamplesRef.current = 0;
       fluencyTotalSamplesRef.current = 0;
+      fluencyStartedRef.current = false;
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
       console.error(err);
@@ -1056,17 +1058,20 @@ export default function ViolinTunerGame(): ReactNode {
       analyserRef.current.getFloatTimeDomainData(buffer);
       const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
 
-      // Count every tick towards fluency denominator
-      fluencyTotalSamplesRef.current += 1;
+      // Fluency tracking: only start counting after the first in-tune sample
       if (pitch > 150 && pitch < 1500) {
-        // Check if pitch is near previous note or current (next) note
         const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[scale.notes[currentNoteIndex - 1]] : null;
         const nextNoteFreq = targetFrequency;
         const nearPrev = prevNoteFreq ? Math.abs(getCents(pitch, prevNoteFreq)) < OK_THRESHOLD : false;
         const nearNext = nextNoteFreq ? Math.abs(getCents(pitch, nextNoteFreq)) < OK_THRESHOLD : false;
         if (nearPrev || nearNext) {
+          fluencyStartedRef.current = true;
           fluencyInTuneSamplesRef.current += 1;
         }
+      }
+      // Only count towards total once fluency tracking has started
+      if (fluencyStartedRef.current) {
+        fluencyTotalSamplesRef.current += 1;
       }
 
       // Handle pause between notes (display only — fluency already tracked above)
