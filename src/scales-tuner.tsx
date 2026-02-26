@@ -75,6 +75,7 @@ interface GameSettings {
   bonusWeight: number;          // B, bonus weight (0-1000, default 200, 0 disables)
   fluencyWeight: number;        // b, fluency bonus multiplier (0-5, default 2, 0 disables)
   fluencyExponentQ: number;     // q, fluency curve exponent (1.0-4.0, default 2)
+  fluencyThreshold: number;     // minimum in-tune fraction for bonus (0-0.8, default 0.5)
   autoReplay: boolean;          // automatically restart after completion
   autoReplayDelay: number;      // ms before auto-replay triggers (1000-5000, default 3000)
 }
@@ -98,6 +99,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   bonusWeight: 10,
   fluencyWeight: 2,
   fluencyExponentQ: 2,
+  fluencyThreshold: 0.5,
   autoReplay: true,
   autoReplayDelay: 3000,
 };
@@ -118,6 +120,7 @@ const SETTINGS_RANGES = {
   bonusExponentQ: { min: 0.5, max: 2.0, step: 0.1 },    // bonus exponent q
   fluencyWeight: { min: 0, max: 5, step: 0.5 },           // fluency bonus multiplier
   fluencyExponentQ: { min: 1.0, max: 4.0, step: 0.5 },    // fluency curve exponent
+  fluencyThreshold: { min: 0, max: 0.8, step: 0.05 },     // fluency threshold (0-0.8)
   autoReplayDelay: { min: 1000, max: 5000, step: 500 },  // auto-replay delay
 } as const;
 
@@ -2003,6 +2006,41 @@ export default function ViolinTunerGame(): ReactNode {
           </div>
         </div>
 
+        {/* Fluency Threshold Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Fluency threshold (%)</span>
+            <span style={{ color: '#94a3b8' }}>{Math.round(settings.fluencyThreshold * 100)}%</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Minimum in-tune fraction for bonus (higher = stricter)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Easy</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.fluencyThreshold.min}
+                max={SETTINGS_RANGES.fluencyThreshold.max}
+                step={SETTINGS_RANGES.fluencyThreshold.step}
+                value={settings.fluencyThreshold}
+                onChange={(e) => updateSetting('fluencyThreshold', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.fluencyThreshold, SETTINGS_RANGES.fluencyThreshold.min, SETTINGS_RANGES.fluencyThreshold.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Strict</span>
+          </div>
+        </div>
         {/* Fluency Weight Slider */}
         <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
           <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -2211,7 +2249,8 @@ export default function ViolinTunerGame(): ReactNode {
     let roundedPercent = 0;
     let total = score;
     if (settings.fluencyWeight > 0) {
-      const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
+      const fluencyBase = Math.max(0, (fluencyFraction - settings.fluencyThreshold) / (1 - settings.fluencyThreshold));
+      const rawPercent = settings.fluencyWeight * Math.pow(fluencyBase, settings.fluencyExponentQ) * 100;
       roundedPercent = Math.round(rawPercent / 5) * 5;
       total = Math.round(score * (1 + roundedPercent / 100));
     }
