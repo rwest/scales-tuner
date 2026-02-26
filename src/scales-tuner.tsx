@@ -2184,6 +2184,71 @@ export default function ViolinTunerGame(): ReactNode {
     );
   }
 
+  // Shared score/fluency bonus summary for collapsed/success
+  function ScoreSummary({
+    score,
+    fluencyFraction,
+    settings,
+    instability,
+    COLLAPSE_THRESHOLD,
+    scale,
+    variant,
+    selectedScale
+  }: {
+    score: number;
+    fluencyFraction: number;
+    settings: GameSettings;
+    instability: number;
+    COLLAPSE_THRESHOLD: number;
+    scale: typeof SCALES[string];
+    variant: 'collapsed' | 'success';
+    selectedScale: string;
+  }) {
+    const showStability = variant === 'success';
+    const showCompleted = variant === 'success';
+    const showMadeIt = variant === 'collapsed';
+    const stability = Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100);
+    let roundedPercent = 0;
+    let total = score;
+    if (settings.fluencyWeight > 0) {
+      const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
+      roundedPercent = Math.round(rawPercent / 5) * 5;
+      total = Math.round(score * (1 + roundedPercent / 100));
+    }
+    return (
+      <>
+        {showMadeIt && (
+          <p style={{ color: '#94a3b8' }}>
+            Made it to note {currentNoteIndex + 1} of {scale.notes.length}
+          </p>
+        )}
+        {showCompleted && (
+          <p style={{ color: '#94a3b8' }}>
+            Completed {selectedScale}
+          </p>
+        )}
+        <div style={{ color: '#fff', fontSize: 24, marginTop: 8 }}>
+          Base Score: {score}
+        </div>
+        {settings.fluencyWeight > 0 && (
+          <>
+            <div style={{ color: '#fa6a6a', fontSize: 18, marginTop: 4 }}>
+              Fluency Bonus: +{roundedPercent}%
+            </div>
+            <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+              Total Score: {total}
+            </div>
+          </>
+        )}
+        {showStability && (
+          <p style={{ color: '#94a3b8', marginTop: 4 }}>
+            Tower stability: {stability}%
+          </p>
+        )}
+      </>
+    );
+  }
+
   // Game screen (playing, collapsed, or success)
   return (
     <div style={{
@@ -2317,28 +2382,21 @@ export default function ViolinTunerGame(): ReactNode {
             </div>
 
             {/* Hold progress bar */}
-            {(() => {
-              const streakTier = MULTIPLIER_TIERS.find(t => goodStreakRef.current >= t.streak);
-              const streakColor = streakTier ? streakTier.color : MULTIPLIER_DEFAULT_COLOR;
-              const barColor = (hideTunerWhenPlaying && !isPausedBetweenNotes && !isAutoplayMode) ? '#ffffff' : streakColor;
-              return (
-                <div style={{
-                  width: 150,
-                  height: 8,
-                  background: 'rgba(255,255,255,0.2)',
-                  borderRadius: 4,
-                  marginTop: 8,
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    width: `${holdProgress * 100}%`,
-                    height: '100%',
-                    background: barColor,
-                    transition: 'width 0.05s ease-out',
-                  }} />
-                </div>
-              );
-            })()}
+            <div style={{
+              width: 150,
+              height: 8,
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 4,
+              marginTop: 8,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${holdProgress * 100}%`,
+                height: '100%',
+                background: '#fff',
+                transition: 'width 0.05s ease-out',
+              }} />
+            </div>
             <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
               {isAutoplayMode ? 'Autoplay...' : (gameMode === 'practice' ? 'Hold in tune...' : 'Playing note...')}
             </div>
@@ -2476,31 +2534,18 @@ export default function ViolinTunerGame(): ReactNode {
 
       {/* Game over states */}
       {gameState === 'collapsed' && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: 24,
-        }}>
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
           <h2 style={{ color: '#f87171', fontSize: 28 }}>Tower Collapsed!</h2>
-          <p style={{ color: '#94a3b8' }}>
-            Made it to note {currentNoteIndex + 1} of {scale.notes.length}
-          </p>
-          <div style={{ color: '#fff', fontSize: 24, marginTop: 8 }}>
-            Score: {score}
-          </div>
-          {settings.fluencyWeight > 0 && (() => {
-            // Compute fluency bonus as a percentage, rounded to nearest 5%
-            const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
-            const roundedPercent = Math.round(rawPercent / 5) * 5;
-            const total = Math.round(score * (1 + roundedPercent / 100));
-            return (<>
-              <div style={{ color: '#ff553a', fontSize: 18, marginTop: 4 }}>
-                Fluency Bonus:+{roundedPercent}%
-              </div>
-              <div style={{ color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
-                Total Score: {total}
-              </div>
-            </>);
-          })()}
+          <ScoreSummary
+            score={score}
+            fluencyFraction={fluencyFraction}
+            settings={settings}
+            instability={instability}
+            COLLAPSE_THRESHOLD={COLLAPSE_THRESHOLD}
+            scale={scale}
+            variant="collapsed"
+            selectedScale={selectedScale}
+          />
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
               onClick={() => setGameState('menu')}
@@ -2541,34 +2586,18 @@ export default function ViolinTunerGame(): ReactNode {
       )}
 
       {gameState === 'success' && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: 24,
-        }}>
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
           <h2 style={{ color: '#22e55f', fontSize: 28 }}>🎉 Completed Scale!</h2>
-          <p style={{ color: '#94a3b8' }}>
-            Completed {selectedScale}
-          </p>
-          <div style={{ color: '#22e55f', fontSize: 24, marginTop: 8 }}>
-            Score: {score}
-          </div>
-          {settings.fluencyWeight > 0 && (() => {
-            // Compute fluency bonus as a percentage, rounded to nearest 5%
-            const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
-            const roundedPercent = Math.round(rawPercent / 5) * 5;
-            const total = Math.round(score * (1 + roundedPercent / 100));
-            return (<>
-              <div style={{ color: '#94a3b8', fontSize: 18, marginTop: 4 }}>
-                Fluency Bonus: {roundedPercent}%
-              </div>
-              <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
-                Total Score: {total}
-              </div>
-            </>);
-          })()}
-          <p style={{ color: '#94a3b8', marginTop: 4 }}>
-            Tower stability: {Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
-          </p>
+          <ScoreSummary
+            score={score}
+            fluencyFraction={fluencyFraction}
+            settings={settings}
+            instability={instability}
+            COLLAPSE_THRESHOLD={COLLAPSE_THRESHOLD}
+            scale={scale}
+            variant="success"
+            selectedScale={selectedScale}
+          />
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
               onClick={() => setGameState('menu')}
