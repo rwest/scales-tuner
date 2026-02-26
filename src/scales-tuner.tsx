@@ -2265,9 +2265,9 @@ export default function ViolinTunerGame(): ReactNode {
       setShowBonus(false);
       setShowTotal(false);
       setDisplayedTotal(score);
-      const t1 = setTimeout(() => setShowBase(true), 250);
-      const t2 = setTimeout(() => setShowBonus(true), 750);
-      const t3 = setTimeout(() => setShowTotal(true), 1500);
+      const t1 = setTimeout(() => setShowBase(true), 500);
+      const t2 = setTimeout(() => setShowBonus(true), 1500);
+      const t3 = setTimeout(() => setShowTotal(true), 2500);
       let timerId: number | undefined;
       if (settings.fluencyWeight > 0) {
         setDisplayedTotal(score); // start at base
@@ -2278,7 +2278,7 @@ export default function ViolinTunerGame(): ReactNode {
           const increment = (total - score) / steps;
           let current = score;
           let count = 0;
-          timerId = window.setInterval(() => {
+          timerId = setInterval(() => {
             count++;
             current += increment;
             if (count >= steps) {
@@ -2288,7 +2288,7 @@ export default function ViolinTunerGame(): ReactNode {
               setDisplayedTotal(Math.round(current));
             }
           }, stepTime);
-        }, 1750);
+        }, 3000);
       }
       return () => {
         clearTimeout(t1);
