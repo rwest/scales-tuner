@@ -2254,6 +2254,51 @@ export default function ViolinTunerGame(): ReactNode {
       roundedPercent = Math.round(rawPercent / 5) * 5;
       total = Math.round(score * (1 + roundedPercent / 100));
     }
+    // Animation state
+    const [showBase, setShowBase] = React.useState(false);
+    const [showBonus, setShowBonus] = React.useState(false);
+    const [showTotal, setShowTotal] = React.useState(false);
+    const [displayedTotal, setDisplayedTotal] = React.useState(score);
+
+    React.useEffect(() => {
+      setShowBase(false);
+      setShowBonus(false);
+      setShowTotal(false);
+      setDisplayedTotal(score);
+      const t1 = setTimeout(() => setShowBase(true), 250);
+      const t2 = setTimeout(() => setShowBonus(true), 750);
+      const t3 = setTimeout(() => setShowTotal(true), 1500);
+      let timerId;
+      if (settings.fluencyWeight > 0) {
+        setDisplayedTotal(score); // start at base
+        setTimeout(() => {
+          const duration = 1280; // ms for count up
+          const steps = 64;
+          const stepTime = duration / steps;
+          const increment = (total - score) / steps;
+          let current = score;
+          let count = 0;
+          timerId = setInterval(() => {
+            count++;
+            current += increment;
+            if (count >= steps) {
+              setDisplayedTotal(total);
+              clearInterval(timerId);
+            } else {
+              setDisplayedTotal(Math.round(current));
+            }
+          }, stepTime);
+        }, 1750);
+      }
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        if (timerId) clearInterval(timerId);
+      };
+      // eslint-disable-next-line
+    }, [score, total, settings.fluencyWeight, fluencyFraction, settings.fluencyThreshold]);
+
     return (
       <>
         {showMadeIt && (
@@ -2266,16 +2311,31 @@ export default function ViolinTunerGame(): ReactNode {
             Completed {selectedScale}
           </p>
         )}
-        <div style={{ color: '#fff', fontSize: 24, marginTop: 8 }}>
-          Base Score: {score}
+        <div style={{
+          color: '#fff', fontSize: 24, marginTop: 8,
+          opacity: showBase ? 1 : 0,
+          transform: showBase ? 'translateX(0)' : 'translateX(-40px)',
+          transition: 'opacity 0.3s, transform 0.4s',
+        }}>
+          Base Score: <span style={{ fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{score}</span>
         </div>
         {settings.fluencyWeight > 0 && (
           <>
-            <div style={{ color: '#fa6a6a', fontSize: 18, marginTop: 4 }}>
+            <div style={{
+              color: '#fa6a6a', fontSize: 18, marginTop: 4,
+              opacity: showBonus ? 1 : 0,
+              transform: showBonus ? 'translateX(0)' : 'translateX(-40px)',
+              transition: 'opacity 0.3s, transform 0.4s',
+            }}>
               Fluency Bonus: +{roundedPercent}%
             </div>
-            <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
-              Total Score: {total}
+            <div style={{
+              color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8,
+              opacity: showTotal ? 1 : 0,
+              transform: showTotal ? 'translateX(0)' : 'translateX(-40px)',
+              transition: 'opacity 0.3s, transform 0.4s',
+            }}>
+              Total Score: <span style={{ fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{displayedTotal}</span>
             </div>
           </>
         )}
