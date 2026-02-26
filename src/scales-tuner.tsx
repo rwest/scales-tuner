@@ -2488,11 +2488,13 @@ export default function ViolinTunerGame(): ReactNode {
             Score: {score}
           </div>
           {settings.fluencyWeight > 0 && (() => {
-            const fb = Math.round(score * settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) / 100) * 100;
-            const total = score + fb;
+            // Compute fluency bonus as a percentage, rounded to nearest 5%
+            const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
+            const roundedPercent = Math.round(rawPercent / 5) * 5;
+            const total = Math.round(score * (1 + roundedPercent / 100));
             return (<>
-              <div style={{ color: '#94a3b8', fontSize: 18, marginTop: 4 }}>
-                Fluency Bonus: {fb}
+              <div style={{ color: '#ff553a', fontSize: 18, marginTop: 4 }}>
+                Fluency Bonus:+{roundedPercent}%
               </div>
               <div style={{ color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
                 Total Score: {total}
@@ -2551,11 +2553,13 @@ export default function ViolinTunerGame(): ReactNode {
             Score: {score}
           </div>
           {settings.fluencyWeight > 0 && (() => {
-            const fb = Math.round(score * settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) / 100) * 100;
-            const total = score + fb;
+            // Compute fluency bonus as a percentage, rounded to nearest 5%
+            const rawPercent = settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) * 100;
+            const roundedPercent = Math.round(rawPercent / 5) * 5;
+            const total = Math.round(score * (1 + roundedPercent / 100));
             return (<>
               <div style={{ color: '#94a3b8', fontSize: 18, marginTop: 4 }}>
-                Fluency Bonus: {fb}
+                Fluency Bonus: {roundedPercent}%
               </div>
               <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
                 Total Score: {total}
