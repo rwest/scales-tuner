@@ -73,6 +73,8 @@ interface GameSettings {
   bonusEpsilonCents: number;    // eps stabiliser in cents (0.5-5.0, default 1.5)
   bonusExponentQ: number;       // q exponent (0.5-2.0, default 1.0)
   bonusWeight: number;          // B, bonus weight (0-1000, default 200, 0 disables)
+  fluencyWeight: number;        // b, fluency bonus multiplier (0-5, default 2, 0 disables)
+  fluencyExponentQ: number;     // q, fluency curve exponent (1.0-4.0, default 2)
   autoReplay: boolean;          // automatically restart after completion
   autoReplayDelay: number;      // ms before auto-replay triggers (1000-5000, default 3000)
 }
@@ -94,6 +96,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   bonusEpsilonCents: 1.5,
   bonusExponentQ: 1.0,
   bonusWeight: 10,
+  fluencyWeight: 2,
+  fluencyExponentQ: 2,
   autoReplay: true,
   autoReplayDelay: 3000,
 };
@@ -112,6 +116,8 @@ const SETTINGS_RANGES = {
   bonusTauMultiplier: { min: 0.5, max: 3.0, step: 0.1 }, // bonus tau multiplier
   bonusEpsilonCents: { min: 0.5, max: 5.0, step: 0.25 }, // bonus epsilon
   bonusExponentQ: { min: 0.5, max: 2.0, step: 0.1 },    // bonus exponent q
+  fluencyWeight: { min: 0, max: 5, step: 0.5 },           // fluency bonus multiplier
+  fluencyExponentQ: { min: 1.0, max: 4.0, step: 0.5 },    // fluency curve exponent
   autoReplayDelay: { min: 1000, max: 5000, step: 500 },  // auto-replay delay
 } as const;
 
@@ -709,6 +715,7 @@ export default function ViolinTunerGame(): ReactNode {
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [replayProgress, setReplayProgress] = useState<number>(0);
   const [showAdvancedScoring, setShowAdvancedScoring] = useState<boolean>(false);
+  const [fluencyFraction, setFluencyFraction] = useState<number>(0);
   const replayAnimRef = useRef<number | null>(null);
 
   // Derived thresholds from settings
@@ -732,6 +739,9 @@ export default function ViolinTunerGame(): ReactNode {
   const autoplayNoteStartTimeRef = useRef<number | null>(null);
   const autoplayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const replayStartRef = useRef<number | null>(null);
+  // Fluency tracking refs: count in-tune vs total audio samples during inter-note pauses
+  const fluencyInTuneSamplesRef = useRef<number>(0);
+  const fluencyTotalSamplesRef = useRef<number>(0);
   // Refs for decoupled audio→visual updates (iOS Safari throttles rAF aggressively)
   const latestPitchRef = useRef<number | null>(null);
   const latestCentsRef = useRef<number>(0);
@@ -805,11 +815,14 @@ export default function ViolinTunerGame(): ReactNode {
       setIsPausedBetweenNotes(false);
       setIsAutoplayMode(false);
       setPauseAverageCents(0);
+      setFluencyFraction(0);
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
       accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
       goodStreakRef.current = 0;
+      fluencyInTuneSamplesRef.current = 0;
+      fluencyTotalSamplesRef.current = 0;
     } catch (err) {
       setError('Microphone access denied. Please allow microphone access and try again.');
       console.error(err);
@@ -873,6 +886,12 @@ export default function ViolinTunerGame(): ReactNode {
       setScore(totalPoints);
       return arr;
     });
+
+    // Compute fluency fraction before potential game end
+    const fTotal = fluencyTotalSamplesRef.current;
+    const fInTune = fluencyInTuneSamplesRef.current;
+    const frac = fTotal > 0 ? fInTune / fTotal : 0;
+    setFluencyFraction(frac);
 
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
@@ -1031,7 +1050,26 @@ export default function ViolinTunerGame(): ReactNode {
         }
       }
 
-      // Handle pause between notes
+      // --- Fluency tracking: sample audio on every tick for the whole scale ---
+      // Read audio buffer once; reused for both fluency and normal processing
+      const buffer = new Float32Array(analyserRef.current.fftSize);
+      analyserRef.current.getFloatTimeDomainData(buffer);
+      const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
+
+      // Count every tick towards fluency denominator
+      fluencyTotalSamplesRef.current += 1;
+      if (pitch > 150 && pitch < 1500) {
+        // Check if pitch is near previous note or current (next) note
+        const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[scale.notes[currentNoteIndex - 1]] : null;
+        const nextNoteFreq = targetFrequency;
+        const nearPrev = prevNoteFreq ? Math.abs(getCents(pitch, prevNoteFreq)) < OK_THRESHOLD : false;
+        const nearNext = nextNoteFreq ? Math.abs(getCents(pitch, nextNoteFreq)) < OK_THRESHOLD : false;
+        if (nearPrev || nearNext) {
+          fluencyInTuneSamplesRef.current += 1;
+        }
+      }
+
+      // Handle pause between notes (display only — fluency already tracked above)
       if (isPausedBetweenNotes && pauseStartTimeRef.current) {
         const pauseElapsed = Date.now() - pauseStartTimeRef.current;
         if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
@@ -1039,11 +1077,6 @@ export default function ViolinTunerGame(): ReactNode {
         }
         return;
       }
-
-      const buffer = new Float32Array(analyserRef.current.fftSize);
-      analyserRef.current.getFloatTimeDomainData(buffer);
-
-      const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
 
       if (isPausedBetweenNotes) return;
 
@@ -1965,6 +1998,78 @@ export default function ViolinTunerGame(): ReactNode {
           </div>
         </div>
 
+        {/* Fluency Weight Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Fluency weight (b)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.fluencyWeight.toFixed(1)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            Bonus for smooth note transitions (0 = disabled)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Off</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.fluencyWeight.min}
+                max={SETTINGS_RANGES.fluencyWeight.max}
+                step={SETTINGS_RANGES.fluencyWeight.step}
+                value={settings.fluencyWeight}
+                onChange={(e) => updateSetting('fluencyWeight', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.fluencyWeight, SETTINGS_RANGES.fluencyWeight.min, SETTINGS_RANGES.fluencyWeight.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>High</span>
+          </div>
+        </div>
+
+        {/* Fluency Exponent Q Slider */}
+        <div style={{ width: '100%', maxWidth: 320, marginBottom: 24 }}>
+          <div style={{ color: '#fff', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>Fluency exponent (q)</span>
+            <span style={{ color: '#94a3b8' }}>{settings.fluencyExponentQ.toFixed(1)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+            How sharply fluency bonus drops with gaps (higher = stricter)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Gentle</span>
+            <div style={{ flex: 1, position: 'relative', height: 24 }}>
+              <input
+                className="settings-slider"
+                type="range"
+                min={SETTINGS_RANGES.fluencyExponentQ.min}
+                max={SETTINGS_RANGES.fluencyExponentQ.max}
+                step={SETTINGS_RANGES.fluencyExponentQ.step}
+                value={settings.fluencyExponentQ}
+                onChange={(e) => updateSetting('fluencyExponentQ', Number(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <div style={{
+                position: 'absolute',
+                left: `${getSliderPercent(DEFAULT_SETTINGS.fluencyExponentQ, SETTINGS_RANGES.fluencyExponentQ.min, SETTINGS_RANGES.fluencyExponentQ.max)}%`,
+                top: -4,
+                width: 2,
+                height: 8,
+                background: '#64748b',
+                pointerEvents: 'none',
+              }} />
+            </div>
+            <span style={{ color: '#94a3b8', fontSize: 12 }}>Sharp</span>
+          </div>
+        </div>
+
         </>)}
 
         {/* Auto-replay delay */}
@@ -2374,9 +2479,21 @@ export default function ViolinTunerGame(): ReactNode {
           <p style={{ color: '#94a3b8' }}>
             Made it to note {currentNoteIndex + 1} of {scale.notes.length}
           </p>
-          <div style={{ color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 8 }}>
-            Final Score: {score}
+          <div style={{ color: '#fff', fontSize: 24, marginTop: 8 }}>
+            Score: {score}
           </div>
+          {settings.fluencyWeight > 0 && (() => {
+            const fb = Math.round(score * settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) / 100) * 100;
+            const total = score + fb;
+            return (<>
+              <div style={{ color: '#94a3b8', fontSize: 18, marginTop: 4 }}>
+                Fluency Bonus: {fb}
+              </div>
+              <div style={{ color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+                Total Score: {total}
+              </div>
+            </>);
+          })()}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
               onClick={() => setGameState('menu')}
@@ -2425,9 +2542,21 @@ export default function ViolinTunerGame(): ReactNode {
           <p style={{ color: '#94a3b8' }}>
             Completed {selectedScale}
           </p>
-          <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+          <div style={{ color: '#22e55f', fontSize: 24, marginTop: 8 }}>
             Score: {score}
           </div>
+          {settings.fluencyWeight > 0 && (() => {
+            const fb = Math.round(score * settings.fluencyWeight * Math.pow(fluencyFraction, settings.fluencyExponentQ) / 100) * 100;
+            const total = score + fb;
+            return (<>
+              <div style={{ color: '#94a3b8', fontSize: 18, marginTop: 4 }}>
+                Fluency Bonus: {fb}
+              </div>
+              <div style={{ color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8 }}>
+                Total Score: {total}
+              </div>
+            </>);
+          })()}
           <p style={{ color: '#94a3b8', marginTop: 4 }}>
             Tower stability: {Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100)}%
           </p>
