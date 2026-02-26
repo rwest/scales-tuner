@@ -168,7 +168,7 @@ const MULTIPLIER_TIERS = [
   { streak: 10, multiplier: 4, color: '#63cef8' },
   { streak:  5, multiplier: 2, color: '#facc15' },
 ] as const;
-const MULTIPLIER_DEFAULT_COLOR = '#22e55f'; // green (no multiplier)
+
 
 // Note frequencies for all scales (2 octaves)
 const NOTE_FREQUENCIES: NoteFrequencies = {
@@ -2268,7 +2268,7 @@ export default function ViolinTunerGame(): ReactNode {
       const t1 = setTimeout(() => setShowBase(true), 250);
       const t2 = setTimeout(() => setShowBonus(true), 750);
       const t3 = setTimeout(() => setShowTotal(true), 1500);
-      let timerId;
+      let timerId: number | undefined;
       if (settings.fluencyWeight > 0) {
         setDisplayedTotal(score); // start at base
         setTimeout(() => {
@@ -2278,12 +2278,12 @@ export default function ViolinTunerGame(): ReactNode {
           const increment = (total - score) / steps;
           let current = score;
           let count = 0;
-          timerId = setInterval(() => {
+          timerId = window.setInterval(() => {
             count++;
             current += increment;
             if (count >= steps) {
               setDisplayedTotal(total);
-              clearInterval(timerId);
+              if (timerId !== undefined) clearInterval(timerId);
             } else {
               setDisplayedTotal(Math.round(current));
             }
@@ -2294,9 +2294,9 @@ export default function ViolinTunerGame(): ReactNode {
         clearTimeout(t1);
         clearTimeout(t2);
         clearTimeout(t3);
-        if (timerId) clearInterval(timerId);
+        if (timerId !== undefined) clearInterval(timerId);
       };
-      // eslint-disable-next-line
+
     }, [score, total, settings.fluencyWeight, fluencyFraction, settings.fluencyThreshold]);
 
     return (
