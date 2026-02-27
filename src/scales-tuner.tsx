@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'reac
 import Vex from 'vexflow';
 
 // Type definitions
-type GameState = 'menu' | 'settings' | 'playing' | 'collapsed' | 'success';
+type GameState = 'menu' | 'settings' | 'playing' | 'collapsed' | 'success' | 'scores';
 type GameMode = 'practice' | 'test';
 
 interface NoteFrequencies {
@@ -52,6 +52,13 @@ interface BrickProps {
 interface FallingBrickProps {
   brick: Brick;
   startTime: number;
+}
+
+interface ScoreEntry {
+  datetime: string; // ISO string
+  scale: string;
+  score: number;
+  result?: 'success' | 'failed';
 }
 
 // Settings interface for user-configurable options
@@ -154,6 +161,53 @@ function saveSettings(settings: GameSettings): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch (e) {
     console.error('Failed to save settings:', e);
+  }
+}
+
+// Save a score entry to localStorage
+function saveScore(entry: ScoreEntry) {
+  try {
+    const raw = localStorage.getItem('scaleTowerScores');
+    const arr: ScoreEntry[] = raw ? (JSON.parse(raw) as ScoreEntry[]) : [];
+    if (Array.isArray(arr)) {
+      arr.push(entry);
+      localStorage.setItem('scaleTowerScores', JSON.stringify(arr));
+    } else {
+      localStorage.setItem('scaleTowerScores', JSON.stringify([entry]));
+    }
+  } catch (e) {
+    console.error('Failed to save score:', e);
+  }
+}
+// Load scores from localStorage
+function loadScores(): ScoreEntry[] {
+  try {
+    const raw = localStorage.getItem('scaleTowerScores');
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(arr)) return [];
+    function isScoreEntryLike(obj: unknown): obj is ScoreEntry {
+      return (
+        typeof obj === 'object' && obj !== null &&
+        typeof (obj as { datetime?: unknown }).datetime === 'string' &&
+        typeof (obj as { scale?: unknown }).scale === 'string' &&
+        typeof (obj as { score?: unknown }).score === 'number' &&
+        (
+          (typeof (obj as { result?: unknown }).result === 'undefined') ||
+          (obj as { result?: unknown }).result === 'success' ||
+          (obj as { result?: unknown }).result === 'failed'
+        )
+      );
+    }
+    return arr.filter(isScoreEntryLike).map(e => ({
+      datetime: e.datetime,
+      scale: e.scale,
+      score: e.score,
+      result: e.result,
+    }));
+  } catch (e: unknown) {
+    console.error('Failed to load scores:', e instanceof Error ? e.message : e);
+    return [];
   }
 }
 
@@ -754,6 +808,14 @@ export default function ViolinTunerGame(): ReactNode {
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
   const targetFrequency = NOTE_FREQUENCIES[currentNote];
+  // Clear all scores from localStorage
+  function clearScores() {
+    try {
+      localStorage.removeItem('scaleTowerScores');
+    } catch (e) {
+      console.error('Failed to clear scores:', e);
+    }
+  }
 
   // Auto-replay countdown after success
   useEffect(() => {
@@ -898,16 +960,31 @@ export default function ViolinTunerGame(): ReactNode {
     const frac = fTotal > 0 ? fInTune / fTotal : 0;
     setFluencyFraction(frac);
 
+
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
       setCollapseTime(Date.now());
       stopGame();
+      // Save score as failed
+      saveScore({
+        datetime: new Date().toISOString(),
+        scale: selectedScale,
+        score: Math.round(score),
+        result: 'failed',
+      });
       return true; // ended
     }
 
     if (currentNoteIndex + 1 >= scale.notes.length) {
       setGameState('success');
       stopGame();
+      // Save score as success
+      saveScore({
+        datetime: new Date().toISOString(),
+        scale: selectedScale,
+        score: Math.round(score),
+        result: 'success',
+      });
       return true; // ended
     }
 
@@ -921,7 +998,7 @@ export default function ViolinTunerGame(): ReactNode {
     noteSamplesRef.current = [];
 
     return false; // not ended
-  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex, COLLAPSE_THRESHOLD]);
+  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex, COLLAPSE_THRESHOLD, score, selectedScale]);
 
   // Helper to accept a completed note (shared between practice and test modes)
   const acceptNote = useCallback(() => {
@@ -1257,6 +1334,9 @@ export default function ViolinTunerGame(): ReactNode {
 
   const tuning = getTuningIndicator();
 
+  // State for clear scores confirmation popup (used in scores page)
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+
   // Menu screen
   if (gameState === 'menu') {
     return (
@@ -1340,6 +1420,26 @@ export default function ViolinTunerGame(): ReactNode {
             />
             Auto-replay
           </label>
+          <button
+            onClick={() => setGameState('scores')}
+            style={{
+              marginTop: 8,
+              padding: '8px 16px',
+              fontSize: 18,
+              borderRadius: 8,
+              border: 'none',
+              background: '#334155',
+              color: '#fff',
+              cursor: 'pointer',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              display: 'flex',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>🥇</span> Scores
+          </button>
           <button
             onClick={() => setGameState('settings')}
             style={{
@@ -1473,6 +1573,130 @@ export default function ViolinTunerGame(): ReactNode {
     );
   }
 
+   // Scores page rendering (must be after all hooks)
+  if (gameState === 'scores') {
+    // Group scores by date string (e.g., 'February 27')
+    const scores = loadScores();
+    const dateGroups: { [date: string]: ScoreEntry[] } = {};
+    for (const entry of scores) {
+      const d = new Date(entry.datetime);
+      const dateStr = d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+      if (!dateGroups[dateStr]) dateGroups[dateStr] = [];
+      dateGroups[dateStr].push(entry);
+    }
+    // Sort dates descending (newest first)
+    const sortedDates = Object.keys(dateGroups).sort((a, b) => {
+      // Parse month/day for comparison
+      const parse = (s: string) => {
+        const [month, day] = s.split(' ');
+        return [new Date(`${month} 1, 2000`).getMonth(), parseInt(day, 10)];
+      };
+      const [ma, da] = parse(a);
+      const [mb, db] = parse(b);
+      if (ma !== mb) return mb - ma;
+      return db - da;
+    });
+
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: 20,
+        fontFamily: 'system-ui, sans-serif',
+        overflowY: 'auto',
+        boxSizing: 'border-box',
+      }}>
+        <h1 style={{ color: '#fff', fontSize: 28, marginBottom: 12 }}>📈 Scores</h1>
+        <div style={{ width: '100%', maxWidth: 420, background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 0, marginBottom: 24 }}>
+          {sortedDates.length === 0 && (
+            <div style={{ color: '#94a3b8', textAlign: 'center', padding: 32, fontSize: 18 }}>
+              No scores yet.
+            </div>
+          )}
+          {sortedDates.map(dateStr => (
+            <div key={dateStr} style={{ marginBottom: 0 }}>
+              <div style={{ color: '#facc15', fontWeight: 600, fontSize: 18, padding: '18px 24px 6px 24px', borderBottom: '1px solid #334155', background: 'rgba(255,255,255,0.04)' }}>{dateStr}</div>
+              {dateGroups[dateStr].map((entry, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', borderBottom: i === dateGroups[dateStr].length - 1 ? 'none' : '1px solid #334155', background: entry.result === 'failed' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)' }}>
+                  <span style={{ color: '#fff', fontWeight: 500 }}>{formatScaleName(entry.scale)}</span>
+                  <span style={{ color: entry.result === 'failed' ? '#ef4444' : '#22c55e', fontWeight: 600 }}>{entry.score.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <button
+            onClick={() => setGameState('menu')}
+            style={{
+              padding: '12px 24px',
+              fontSize: 18,
+              borderRadius: 8,
+              border: 'none',
+              background: '#334155',
+              color: '#fff',
+              cursor: 'pointer',
+              width: '100%',
+              marginBottom: 8,
+            }}
+          >
+            ← Menu
+          </button>
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            style={{
+              padding: '12px 24px',
+              fontSize: 18,
+              borderRadius: 8,
+              border: 'none',
+              background: '#ef4444',
+              color: '#fff',
+              cursor: 'pointer',
+              width: '100%',
+              marginBottom: 8,
+              fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(239,68,68,0.12)',
+            }}
+          >
+            Clear Scores
+          </button>
+        </div>
+        {/* Confirmation pop-up */}
+        {showClearConfirm && (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}>
+            <div style={{ background: '#1e293b', borderRadius: 12, padding: 32, boxShadow: '0 4px 32px rgba(0,0,0,0.25)', minWidth: 280, maxWidth: '90vw', textAlign: 'center' }}>
+              <div style={{ color: '#fff', fontSize: 20, marginBottom: 18, fontWeight: 600 }}>Clear all scores?</div>
+              <div style={{ color: '#94a3b8', fontSize: 15, marginBottom: 24 }}>This cannot be undone.</div>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+                <button
+                  onClick={() => { clearScores(); setShowClearConfirm(false); }}
+                  style={{ padding: '10px 24px', fontSize: 16, borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Yes, clear
+                </button>
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  style={{ padding: '10px 24px', fontSize: 16, borderRadius: 8, border: 'none', background: '#334155', color: '#fff', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
   // Settings screen
   if (gameState === 'settings') {
     const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
