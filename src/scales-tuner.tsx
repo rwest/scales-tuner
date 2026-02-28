@@ -967,40 +967,16 @@ export default function ViolinTunerGame(): ReactNode {
       return arr;
     });
 
-    // Compute fluency fraction before potential game end
-    const fTotal = fluencyTotalSamplesRef.current;
-    const fInTune = fluencyInTuneSamplesRef.current;
-    const frac = fTotal > 0 ? fInTune / fTotal : 0;
-    setFluencyFraction(frac);
-
-
-    // Compute total score with fluency bonus
-    const { total: totalScore } = getTotalScore(score, fluencyFraction, settings);
-
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
       setCollapseTime(Date.now());
       stopGame();
-      // Save score as failed
-      saveScore({
-        datetime: new Date().toISOString(),
-        scale: selectedScale,
-        score: totalScore,
-        result: 'failed',
-      });
       return true; // ended
     }
 
     if (currentNoteIndex + 1 >= scale.notes.length) {
       setGameState('success');
       stopGame();
-      // Save score as success
-      saveScore({
-        datetime: new Date().toISOString(),
-        scale: selectedScale,
-        score: totalScore,
-        result: 'success',
-      });
       return true; // ended
     }
 
@@ -1267,6 +1243,26 @@ export default function ViolinTunerGame(): ReactNode {
       }
     };
   }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, settings, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
+
+  // After game ends, calculate and save final score.
+  useEffect(() => {
+    if (gameState === 'collapsed' || gameState === 'success') {
+      // Compute fluency fraction
+      const fTotal = fluencyTotalSamplesRef.current;
+      const fInTune = fluencyInTuneSamplesRef.current;
+      const frac = fTotal > 0 ? fInTune / fTotal : 0;
+      setFluencyFraction(frac);
+      // Compute final score
+      const { total: finalTotal, bonusPercent } = getTotalScore(score, frac, settings);
+      saveScore({
+        datetime: new Date().toISOString(),
+        scale: selectedScale,
+        score: finalTotal,
+        result: gameState === 'collapsed' ? 'failed' : 'success',
+      });
+    }
+  }, [gameState]);
+
 
   // Version checking - periodically check for updates when on menu screen
   useEffect(() => {
