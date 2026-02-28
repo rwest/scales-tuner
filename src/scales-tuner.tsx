@@ -382,16 +382,16 @@ function notePointsFromE(E: number, GOOD: number, settings: GameSettings): numbe
 }
 
 // Utility to compute total score with fluency bonus
-function getTotalScore(baseScore: number, fluencyFraction: number, settings: GameSettings): { total: number; bonusPercent: number } {
+function getTotalScore(baseScore: number, fluencyFraction: number, settings: GameSettings): { totalScore: number; bonusPercent: number } {
   let bonusPercent = 0;
-  let total = baseScore;
+  let totalScore = baseScore;
   if (settings.fluencyWeight > 0) {
     const fluencyBase = Math.max(0, (fluencyFraction - settings.fluencyThreshold) / (1 - settings.fluencyThreshold));
     const rawPercent = settings.fluencyWeight * Math.pow(fluencyBase, settings.fluencyExponentQ) * 100;
     bonusPercent = Math.round(rawPercent / 5) * 5;
-    total = Math.round(baseScore * (1 + bonusPercent / 100));
+    totalScore = Math.round(baseScore * (1 + bonusPercent / 100));
   }
-  return { total, bonusPercent };
+  return { totalScore, bonusPercent };
 }
 
 // Map scale names to VexFlow key signatures
@@ -990,7 +990,7 @@ export default function ViolinTunerGame(): ReactNode {
     noteSamplesRef.current = [];
 
     return false; // not ended
-  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex, COLLAPSE_THRESHOLD, score, selectedScale]);
+  }, [bricks.length, instability, scale, noCollapse, stopGame, currentNote, currentNoteIndex, COLLAPSE_THRESHOLD]);
 
   // Helper to accept a completed note (shared between practice and test modes)
   const acceptNote = useCallback(() => {
@@ -1252,16 +1252,15 @@ export default function ViolinTunerGame(): ReactNode {
       const fInTune = fluencyInTuneSamplesRef.current;
       const frac = fTotal > 0 ? fInTune / fTotal : 0;
       setFluencyFraction(frac);
-      // Compute final score
-      const { total: finalTotal, bonusPercent } = getTotalScore(score, frac, settings);
+      const { totalScore } = getTotalScore(score, frac, settings);
       saveScore({
         datetime: new Date().toISOString(),
         scale: selectedScale,
-        score: finalTotal,
+        score: totalScore,
         result: gameState === 'collapsed' ? 'failed' : 'success',
       });
     }
-  }, [gameState]);
+  }, [gameState, score, selectedScale, settings]);
 
 
   // Version checking - periodically check for updates when on menu screen
@@ -2483,7 +2482,7 @@ export default function ViolinTunerGame(): ReactNode {
     const showCompleted = variant === 'success';
     const showMadeIt = variant === 'collapsed';
     const stability = Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100);
-    const { total, bonusPercent} = getTotalScore(score, fluencyFraction, settings);
+    const { totalScore, bonusPercent} = getTotalScore(score, fluencyFraction, settings);
     // Animation state
     const [showBase, setShowBase] = React.useState(false);
     const [showBonus, setShowBonus] = React.useState(false);
@@ -2505,14 +2504,14 @@ export default function ViolinTunerGame(): ReactNode {
           const duration = 1280; // ms for count up
           const steps = 64;
           const stepTime = duration / steps;
-          const increment = (total - score) / steps;
+          const increment = (totalScore - score) / steps;
           let current = score;
           let count = 0;
           timerId = setInterval(() => {
             count++;
             current += increment;
             if (count >= steps) {
-              setDisplayedTotal(total);
+              setDisplayedTotal(totalScore);
               if (timerId !== undefined) clearInterval(timerId);
             } else {
               setDisplayedTotal(Math.round(current));
@@ -2527,7 +2526,7 @@ export default function ViolinTunerGame(): ReactNode {
         if (timerId !== undefined) clearInterval(timerId);
       };
 
-    }, [score, total, settings.fluencyWeight, fluencyFraction, settings.fluencyThreshold]);
+    }, [score, totalScore, settings.fluencyWeight, fluencyFraction, settings.fluencyThreshold]);
 
     return (
       <>
