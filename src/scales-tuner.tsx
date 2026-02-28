@@ -381,6 +381,19 @@ function notePointsFromE(E: number, GOOD: number, settings: GameSettings): numbe
   return settings.basePointsPerNote * s + settings.bonusWeight * b;
 }
 
+// Utility to compute total score with fluency bonus
+function getTotalScore(baseScore: number, fluencyFraction: number, settings: GameSettings): { total: number; bonusPercent: number } {
+  let bonusPercent = 0;
+  let total = baseScore;
+  if (settings.fluencyWeight > 0) {
+    const fluencyBase = Math.max(0, (fluencyFraction - settings.fluencyThreshold) / (1 - settings.fluencyThreshold));
+    const rawPercent = settings.fluencyWeight * Math.pow(fluencyBase, settings.fluencyExponentQ) * 100;
+    bonusPercent = Math.round(rawPercent / 5) * 5;
+    total = Math.round(baseScore * (1 + bonusPercent / 100));
+  }
+  return { total, bonusPercent };
+}
+
 // Map scale names to VexFlow key signatures
 function getKeySignatureForScale(scaleName: string): string {
   const keyMap: { [key: string]: string } = {
@@ -961,6 +974,9 @@ export default function ViolinTunerGame(): ReactNode {
     setFluencyFraction(frac);
 
 
+    // Compute total score with fluency bonus
+    const { total: totalScore } = getTotalScore(score, fluencyFraction, settings);
+
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
       setGameState('collapsed');
       setCollapseTime(Date.now());
@@ -969,7 +985,7 @@ export default function ViolinTunerGame(): ReactNode {
       saveScore({
         datetime: new Date().toISOString(),
         scale: selectedScale,
-        score: Math.round(score),
+        score: totalScore,
         result: 'failed',
       });
       return true; // ended
@@ -982,7 +998,7 @@ export default function ViolinTunerGame(): ReactNode {
       saveScore({
         datetime: new Date().toISOString(),
         scale: selectedScale,
-        score: Math.round(score),
+        score: totalScore,
         result: 'success',
       });
       return true; // ended
@@ -2471,14 +2487,7 @@ export default function ViolinTunerGame(): ReactNode {
     const showCompleted = variant === 'success';
     const showMadeIt = variant === 'collapsed';
     const stability = Math.round((1 - instability / (COLLAPSE_THRESHOLD * scale.notes.length)) * 100);
-    let roundedPercent = 0;
-    let total = score;
-    if (settings.fluencyWeight > 0) {
-      const fluencyBase = Math.max(0, (fluencyFraction - settings.fluencyThreshold) / (1 - settings.fluencyThreshold));
-      const rawPercent = settings.fluencyWeight * Math.pow(fluencyBase, settings.fluencyExponentQ) * 100;
-      roundedPercent = Math.round(rawPercent / 5) * 5;
-      total = Math.round(score * (1 + roundedPercent / 100));
-    }
+    const { total, bonusPercent} = getTotalScore(score, fluencyFraction, settings);
     // Animation state
     const [showBase, setShowBase] = React.useState(false);
     const [showBonus, setShowBonus] = React.useState(false);
@@ -2552,7 +2561,7 @@ export default function ViolinTunerGame(): ReactNode {
               transform: showBonus ? 'translateX(0)' : 'translateX(-40px)',
               transition: 'opacity 0.3s, transform 0.4s',
             }}>
-              Fluency Bonus: +{roundedPercent}%
+              Fluency Bonus: +{bonusPercent}%
             </div>
             <div style={{
               color: '#22e55f', fontSize: 36, fontWeight: 'bold', marginTop: 8,
