@@ -1600,6 +1600,7 @@ export default function ViolinTunerGame(): ReactNode {
     return (
       <div style={{
         minHeight: '100vh',
+        maxHeight: '100vh',
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         display: 'flex',
         flexDirection: 'column',
