@@ -1592,7 +1592,7 @@ export default function ViolinTunerGame(): ReactNode {
    // Scores page rendering (must be after all hooks)
   if (gameState === 'scores') {
     // Group scores by date string (e.g., 'February 27')
-    const scores = loadScores();
+    const scores = loadScores().reverse();
     const dateGroups: { [date: string]: ScoreEntry[] } = {};
     for (const entry of scores) {
       const d = new Date(entry.datetime);
