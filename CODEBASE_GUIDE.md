@@ -33,7 +33,19 @@ scale-tuner/
 │       └── deploy.yml              # GitHub Actions deployment workflow
 ├── public/                          # Static assets
 ├── src/
-│   ├── scales-tuner.tsx            # Main game component (~1800 lines)
+│   ├── types.ts                    # All shared interfaces and type aliases
+│   ├── constants.ts                # GAME_CONFIG, MULTIPLIER_TIERS
+│   ├── audio/
+│   │   ├── pitchDetection.ts       # autoCorrelate, getCents
+│   │   └── playTone.ts             # playTone
+│   ├── game/
+│   │   ├── scales.ts               # NOTE_FREQUENCIES, SCALES, key signature helpers
+│   │   ├── scoring.ts              # trimmedMeanAbs, notePointsFromE, getTotalScore
+│   │   ├── settings.ts             # DEFAULT_SETTINGS, SETTINGS_RANGES, load/save
+│   │   └── scores.ts               # saveScore, loadScores, clearScores
+│   ├── utils/
+│   │   └── formatting.ts           # formatNoteDisplay, formatScaleName, color/angle helpers
+│   ├── scales-tuner.tsx            # Main game component (React UI only, ~1000 lines)
 │   ├── App.jsx                     # React app wrapper
 │   ├── main.jsx                    # React entry point
 │   ├── App.css                     # App styling
@@ -61,13 +73,48 @@ scale-tuner/
 ## 📄 Key Files Explained
 
 ### [src/scales-tuner.tsx](src/scales-tuner.tsx)
-The heart of the application. This single-file component contains all game logic, UI, and audio processing.
+The main React component (~1000 lines). Contains only UI and React-specific logic — all pure functions and data have been extracted into standalone modules.
 
-#### **Type Definitions**
-- `GameState`: 'menu' | 'settings' | 'playing' | 'collapsed' | 'success'
-- `GameMode`: 'practice' | 'test'
+#### **UI Components**
+- `StaveNoteDisplay`: VexFlow music notation rendering
+- `PitchIndicator`: Visual gradient bar for pitch accuracy
+- `Brick`: Individual tower brick with color/rotation
+- `FallingBrick`: Animated brick for collapse effect
+- `ViolinTunerGame`: Root game component with all state management
+
+### [src/types.ts](src/types.ts)
+All shared TypeScript interfaces and type aliases:
+- `GameState`: `'menu' | 'settings' | 'playing' | 'collapsed' | 'success' | 'scores'`
+- `GameMode`: `'practice' | 'test'`
 - `GameSettings`: User-configurable options (thresholds, durations, enabled scales)
-- `Brick`, `TuningIndicator`, and various component prop interfaces
+- `Brick`, `TuningIndicator`, and component prop interfaces
+- `ScoreEntry`: Shape of a saved score record
+
+### [src/constants.ts](src/constants.ts)
+Non-configurable game constants:
+- `GAME_CONFIG.SAME_NOTE_THRESHOLD`: 50¢ window for recognizing same target note
+- `MULTIPLIER_TIERS`: Streak multiplier thresholds and colors
+
+### [src/game/scales.ts](src/game/scales.ts)
+Scale data and key signature helpers:
+- `NOTE_FREQUENCIES`: Map of note names to Hz (A4 = 440 Hz standard)
+- `SCALES`: Predefined scale patterns with note sequences
+- `KEY_SIGNATURE_ACCIDENTALS`: Lookup for key signature accidentals
+- `getKeySignatureForScale()`: Map scale names to VexFlow key signatures
+- `getKeyAccidental()`: Look up accidental for a note letter in a key
+
+### [src/game/scoring.ts](src/game/scoring.ts)
+Scoring math:
+- `trimmedMeanAbs()`: Robust error statistic (trimmed mean of absolute cents)
+- `notePointsFromE()`: Two-part per-note scoring (accuracy + precision bonus)
+- `getTotalScore()`: Applies fluency bonus to base score
+
+### [src/game/settings.ts](src/game/settings.ts)
+Settings persistence:
+- `DEFAULT_SETTINGS`: Default values for all configurable options
+- `SETTINGS_RANGES`: Min/max/step for each configurable slider
+- `STORAGE_KEY`: localStorage key (`'scaleTowerSettings'`)
+- `loadSettings()` / `saveSettings()`: Read/write to localStorage
 
 #### **Settings System**
 The game has a **Settings screen** where users can customize:
@@ -79,32 +126,26 @@ The game has a **Settings screen** where users can customize:
 - **Curve shape (p)**: How sharply scores drop with error (1.0-4.0)
 - **Score tolerance (k×GOOD)**: Cents window for good scores (1.0-3.0 multiplier)
 - **Enabled Scales**: Which scales appear in the dropdown
-- **Toggle options**: "Keep tower from collapsing", "Hide tuner when playing"
+- **Toggle options**: "Keep tower from collapsing", "Hide tuner when playing", "Auto replay"
 
 Settings are persisted to `localStorage` under the key `scaleTowerSettings`.
 
-#### **Data Constants**
-- `NOTE_FREQUENCIES`: Map of note names to Hz (A4 = 440 Hz standard)
-- `SCALES`: Predefined scale patterns with note sequences
-- `KEY_SIGNATURE_ACCIDENTALS`: Lookup for key signature accidentals
-- `DEFAULT_SETTINGS`: Default values for all configurable options
-- `SETTINGS_RANGES`: Min/max/step for each configurable slider
-- `GAME_CONFIG.SAME_NOTE_THRESHOLD`: Non-configurable cents window (50¢) for recognizing same target note
+### [src/game/scores.ts](src/game/scores.ts)
+Score history persistence:
+- `saveScore()` / `loadScores()` / `clearScores()`: CRUD for score entries in localStorage
 
-#### **Core Functions**
+### [src/audio/pitchDetection.ts](src/audio/pitchDetection.ts)
 - `autoCorrelate()`: Autocorrelation pitch detection from audio buffer
-- `getCents()`: Calculate cents difference between frequencies
-- `trimmedMeanAbs()`: Compute trimmed mean of absolute cents (robust error statistic)
+- `getCents()`: Calculate cents difference between two frequencies
+
+### [src/audio/playTone.ts](src/audio/playTone.ts)
+- `playTone()`: Generate reference tone with harmonics using Web Audio API
+
+### [src/utils/formatting.ts](src/utils/formatting.ts)
 - `getColorFromError()`: Map cents deviation to RGB color
 - `getAngleFromError()`: Map cents deviation to brick rotation angle
-- `getKeySignatureForScale()`: Map scale names to VexFlow key signatures
-- `playTone()`: Generate reference tone with harmonics
-
-#### **UI Components**
-- `StaveNoteDisplay`: VexFlow music notation rendering
-- `PitchIndicator`: Visual gradient bar for pitch accuracy
-- `Brick`: Individual tower brick with color/rotation
-- `FallingBrick`: Animated brick for collapse effect
+- `formatNoteDisplay()` / `formatScaleName()`: Human-friendly note/scale names with symbols
+- `isIPhoneNotStandalone()`: Detect iPhone not running as installed PWA
 
 ### Other Files
 - **[src/App.jsx](src/App.jsx)**: Wrapper that renders `ViolinTunerGame`
@@ -179,17 +220,17 @@ npm run preview # Preview production build
 ## 📝 Common Tasks
 
 ### Adding a New Scale
-1. Add notes to `SCALES` object
-2. Add key signature to `getKeySignatureForScale()`
-3. Add key signature accidentals to `KEY_SIGNATURE_ACCIDENTALS` if the key is new
-4. Ensure notes exist in `NOTE_FREQUENCIES`
-5. Add to `DEFAULT_SETTINGS.enabledScales`
+1. Add notes to `SCALES` in `src/game/scales.ts`
+2. Add key signature to `getKeySignatureForScale()` in `src/game/scales.ts`
+3. Add key signature accidentals to `KEY_SIGNATURE_ACCIDENTALS` in `src/game/scales.ts` if the key is new
+4. Ensure notes exist in `NOTE_FREQUENCIES` in `src/game/scales.ts`
+5. Add to `DEFAULT_SETTINGS.enabledScales` in `src/game/settings.ts`
 
 ### Adjusting Defaults
-Edit `DEFAULT_SETTINGS` for default values, or `SETTINGS_RANGES` for slider limits.
+Edit `DEFAULT_SETTINGS` in `src/game/settings.ts` for default values, or `SETTINGS_RANGES` for slider limits.
 
 ### Modifying Color Scheme
-Edit `getColorFromError()` for brick/indicator colors.
+Edit `getColorFromError()` in `src/utils/formatting.ts` for brick/indicator colors.
 
 ## 🔍 Debugging
 
@@ -210,4 +251,4 @@ Automatic via GitHub Actions on push to `main`.
 
 ---
 
-**Last Updated**: January 21, 2026
+**Last Updated**: March 2026
