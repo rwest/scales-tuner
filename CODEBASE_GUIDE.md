@@ -45,7 +45,16 @@ scale-tuner/
 │   │   └── scores.ts               # saveScore, loadScores, clearScores
 │   ├── utils/
 │   │   └── formatting.ts           # formatNoteDisplay, formatScaleName, color/angle helpers
-│   ├── scales-tuner.tsx            # Main game component (React UI only, ~1000 lines)
+│   ├── components/
+│   │   ├── StaveNoteDisplay.tsx    # VexFlow music notation rendering
+│   │   ├── PitchIndicator.tsx      # Vertical gradient tuning bar
+│   │   ├── Brick.tsx               # Single tower brick
+│   │   ├── FallingBrick.tsx        # Animated falling brick for collapse
+│   │   ├── ScoreSummary.tsx        # End-of-game score display with animation
+│   │   ├── MenuScreen.tsx          # Main menu UI
+│   │   ├── SettingsScreen.tsx      # Settings sliders and toggles
+│   │   └── ScoresScreen.tsx        # Score history display
+│   ├── scales-tuner.tsx            # Main game orchestrator (~1100 lines, React state only)
 │   ├── App.jsx                     # React app wrapper
 │   ├── main.jsx                    # React entry point
 │   ├── App.css                     # App styling
@@ -73,14 +82,18 @@ scale-tuner/
 ## 📄 Key Files Explained
 
 ### [src/scales-tuner.tsx](src/scales-tuner.tsx)
-The main React component (~1000 lines). Contains only UI and React-specific logic — all pure functions and data have been extracted into standalone modules.
+The main game orchestrator (~1100 lines). Contains only React state management and the game screen render — all sub-components and pure logic live in `src/components/` and `src/game/`.
 
-#### **UI Components**
-- `StaveNoteDisplay`: VexFlow music notation rendering
-- `PitchIndicator`: Visual gradient bar for pitch accuracy
-- `Brick`: Individual tower brick with color/rotation
-- `FallingBrick`: Animated brick for collapse effect
-- `ViolinTunerGame`: Root game component with all state management
+### [src/components/](src/components/)
+Standalone React UI components:
+- **`StaveNoteDisplay`**: VexFlow music notation rendering
+- **`PitchIndicator`**: Visual gradient bar for pitch accuracy
+- **`Brick`**: Individual tower brick with color/rotation
+- **`FallingBrick`**: Animated brick for collapse effect
+- **`ScoreSummary`**: End-of-game score display with fluency bonus animation
+- **`MenuScreen`**: Main menu (scale selection, mode buttons, settings/scores nav)
+- **`SettingsScreen`**: All settings sliders and toggles
+- **`ScoresScreen`**: Score history grouped by date with clear option
 
 ### [src/types.ts](src/types.ts)
 All shared TypeScript interfaces and type aliases:

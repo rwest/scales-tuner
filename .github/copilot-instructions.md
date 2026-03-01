@@ -4,7 +4,7 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 
 ## Architecture Overview
 
-**Module Structure**: Game logic is split across focused standalone modules; `scales-tuner.tsx` contains only React UI code (~1000 lines).
+**Module Structure**: Game logic is split across focused standalone modules; `scales-tuner.tsx` is the main orchestrator (~1100 lines, React state only). UI components live in `src/components/`.
 
 ```
 src/
@@ -20,7 +20,16 @@ src/
 │   └── scores.ts             # saveScore, loadScores, clearScores
 ├── utils/
 │   └── formatting.ts         # formatNoteDisplay, formatScaleName, color/angle helpers
-└── scales-tuner.tsx          # Main component (React UI only)
+├── components/
+│   ├── StaveNoteDisplay.tsx  # VexFlow music notation
+│   ├── PitchIndicator.tsx    # Vertical gradient tuning bar
+│   ├── Brick.tsx             # Single tower brick
+│   ├── FallingBrick.tsx      # Animated falling brick
+│   ├── ScoreSummary.tsx      # End-of-game score display with animation
+│   ├── MenuScreen.tsx        # Main menu UI
+│   ├── SettingsScreen.tsx    # Settings sliders and toggles
+│   └── ScoresScreen.tsx      # Score history display
+└── scales-tuner.tsx          # Main orchestrator (React state + game screen render)
 ```
 
 **Tech Stack**:
@@ -103,6 +112,8 @@ Push to `main` triggers GitHub Actions deployment to GitHub Pages.
 **Adjust Defaults**: Edit `DEFAULT_SETTINGS` or `SETTINGS_RANGES` in `src/game/settings.ts`.
 
 **Modify Colors**: Edit `getColorFromError()` in `src/utils/formatting.ts`.
+
+**Modify UI Components**: Each screen and widget lives in its own file under `src/components/`. The main game screen (playing state) is rendered inline in `src/scales-tuner.tsx`.
 
 ## Audio Pipeline
 
