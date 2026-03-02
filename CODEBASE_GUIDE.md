@@ -37,12 +37,16 @@ scale-tuner/
 │   ├── constants.ts                # GAME_CONFIG, MULTIPLIER_TIERS
 │   ├── audio/
 │   │   ├── pitchDetection.ts       # autoCorrelate, getCents
-│   │   └── playTone.ts             # playTone
+│   │   ├── playTone.ts             # playTone
+│   │   └── useAudioPitchDetection.ts  # React hook: mic + AudioContext lifecycle
 │   ├── game/
 │   │   ├── scales.ts               # NOTE_FREQUENCIES, SCALES, key signature helpers
 │   │   ├── scoring.ts              # trimmedMeanAbs, notePointsFromE, getTotalScore
 │   │   ├── settings.ts             # DEFAULT_SETTINGS, SETTINGS_RANGES, load/save
-│   │   └── scores.ts               # saveScore, loadScores, clearScores
+│   │   ├── scores.ts               # saveScore, loadScores, clearScores
+│   │   └── gameState.ts            # GameStateData, GameAction, gameReducer, createInitialState
+│   ├── styles/
+│   │   └── tokens.ts               # Design tokens: colors, gradients, spacing
 │   ├── utils/
 │   │   └── formatting.ts           # formatNoteDisplay, formatScaleName, color/angle helpers
 │   ├── components/
@@ -52,13 +56,14 @@ scale-tuner/
 │   │   ├── FallingBrick.tsx        # Animated falling brick for collapse
 │   │   ├── ScoreSummary.tsx        # End-of-game score display with animation
 │   │   ├── MenuScreen.tsx          # Main menu UI
-│   │   ├── SettingsScreen.tsx      # Settings sliders and toggles
+│   │   ├── SettingSlider.tsx       # Reusable labeled range slider with default marker
+│   │   ├── SettingsScreen.tsx      # Settings sliders and toggles (uses SettingSlider)
 │   │   └── ScoresScreen.tsx        # Score history display
-│   ├── scales-tuner.tsx            # Main game orchestrator (~1100 lines, React state only)
+│   ├── scales-tuner.tsx            # Main orchestrator (~900 lines, useReducer + game screen)
 │   ├── App.jsx                     # React app wrapper
 │   ├── main.jsx                    # React entry point
 │   ├── App.css                     # App styling
-│   ├── index.css                   # Global styles
+│   ├── index.css                   # Global styles (incl. .settings-slider CSS)
 │   └── assets/                     # Image/media assets
 ├── index.html                      # HTML entry point
 ├── package.json                    # Dependencies and scripts
@@ -82,7 +87,7 @@ scale-tuner/
 ## 📄 Key Files Explained
 
 ### [src/scales-tuner.tsx](src/scales-tuner.tsx)
-The main game orchestrator (~1100 lines). Contains only React state management and the game screen render — all sub-components and pure logic live in `src/components/` and `src/game/`.
+The main game orchestrator (~900 lines). Uses `useReducer(gameReducer)` for all game state and delegates audio capture to `useAudioPitchDetection`. Contains the active-game screen render.
 
 ### [src/components/](src/components/)
 Standalone React UI components:
@@ -92,7 +97,8 @@ Standalone React UI components:
 - **`FallingBrick`**: Animated brick for collapse effect
 - **`ScoreSummary`**: End-of-game score display with fluency bonus animation
 - **`MenuScreen`**: Main menu (scale selection, mode buttons, settings/scores nav)
-- **`SettingsScreen`**: All settings sliders and toggles
+- **`SettingSlider`**: Reusable labeled range slider with default-value marker
+- **`SettingsScreen`**: All settings sliders and toggles (uses `SettingSlider`)
 - **`ScoresScreen`**: Score history grouped by date with clear option
 
 ### [src/types.ts](src/types.ts)
@@ -154,11 +160,32 @@ Score history persistence:
 ### [src/audio/playTone.ts](src/audio/playTone.ts)
 - `playTone()`: Generate reference tone with harmonics using Web Audio API
 
+### [src/audio/useAudioPitchDetection.ts](src/audio/useAudioPitchDetection.ts)
+React hook that manages the full audio lifecycle:
+- Requests microphone access when `enabled` becomes true
+- Creates `AudioContext` + `AnalyserNode`, runs 25ms pitch-detection interval
+- Calls `onPitchDetected(pitch, buffer)` on each tick
+- Cleans up (stops mic, closes context) when `enabled` becomes false
+- Returns `{ error }` — surfaces mic permission errors to the main component
+
+### [src/game/gameState.ts](src/game/gameState.ts)
+Centralized state management for the game:
+- `GameStateData`: Full interface for all game state fields (screen, gameplay, audio, settings)
+- `GameAction`: Discriminated union of all dispatchable actions
+- `createInitialState()`: Factory for the initial state (loads settings from localStorage)
+- `gameReducer()`: Pure reducer — handles all state transitions
+
 ### [src/utils/formatting.ts](src/utils/formatting.ts)
 - `getColorFromError()`: Map cents deviation to RGB color
 - `getAngleFromError()`: Map cents deviation to brick rotation angle
 - `formatNoteDisplay()` / `formatScaleName()`: Human-friendly note/scale names with symbols
 - `isIPhoneNotStandalone()`: Detect iPhone not running as installed PWA
+
+### [src/styles/tokens.ts](src/styles/tokens.ts)
+Design token constants shared across components:
+- `colors`: Named color palette (backgrounds, text, accents, game-specific)
+- `gradients`: Common gradient strings
+- `spacing`: Numeric spacing scale
 
 ### Other Files
 - **[src/App.jsx](src/App.jsx)**: Wrapper that renders `ViolinTunerGame`
@@ -179,14 +206,16 @@ playing → (success | collapsed) → menu
 - **success**: All notes completed
 - **collapsed**: Tower fell (unless disabled)
 
+All state is managed by `gameReducer` in `src/game/gameState.ts`, dispatched via `useReducer` in `scales-tuner.tsx`.
+
 ## 🔊 Audio Processing
 
-1. Request microphone via `getUserMedia()`
-2. Create `AudioContext` and `AnalyserNode` (FFT size 2048)
-3. Audio loop runs at ~40Hz via `setInterval` for consistent pitch detection
-4. Visual updates run via `requestAnimationFrame` (may be throttled on iOS)
-5. `autoCorrelate()` converts time-domain audio to frequency
-6. `getCents()` calculates deviation from target note
+1. `useAudioPitchDetection` hook responds to `isListening` becoming true
+2. Requests microphone via `getUserMedia()`, creates `AudioContext` and `AnalyserNode` (FFT size 2048)
+3. Hook runs pitch detection at ~40Hz via `setInterval`, calls `onPitchDetected(pitch)` each tick
+4. Game logic callback (`handlePitchDetected`) runs in the main component, using closure refs for state
+5. Visual updates via `requestAnimationFrame` in a separate `useEffect` (decoupled from audio for iOS Safari compatibility)
+6. `autoCorrelate()` converts time-domain audio to frequency; `getCents()` calculates deviation
 
 ## 🎯 Key Concepts
 
@@ -243,12 +272,12 @@ npm run preview # Preview production build
 Edit `DEFAULT_SETTINGS` in `src/game/settings.ts` for default values, or `SETTINGS_RANGES` for slider limits.
 
 ### Modifying Color Scheme
-Edit `getColorFromError()` in `src/utils/formatting.ts` for brick/indicator colors.
+Edit `getColorFromError()` in `src/utils/formatting.ts` for brick/indicator colors. Edit `src/styles/tokens.ts` for UI chrome colors (buttons, backgrounds, text).
 
 ## 🔍 Debugging
 
 - **Console**: Check browser DevTools for audio errors
-- **React DevTools**: Inspect `gameState`, `settings`, `bricks`, `instability`
+- **React DevTools**: Inspect `state` (the `GameStateData` object from `useReducer`) — contains all game state including `screen`, `bricks`, `instability`, `score`
 - **Audio issues**: Verify microphone permission, test on Chrome
 
 ## Deployment

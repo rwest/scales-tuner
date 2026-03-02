@@ -5,7 +5,7 @@ interface UsePitchDetectionOptions {
   /** true when the game is active and the mic should be captured */
   enabled: boolean;
   /** Called once per audio sample interval (~25ms) with the detected pitch */
-  onPitchDetected: (pitch: number | null, buffer: Float32Array) => void;
+  onPitchDetected: (pitch: number | null) => void;
   fftSize?: number;
   sampleIntervalMs?: number;
 }
@@ -95,7 +95,7 @@ export function useAudioPitchDetection({
           const buffer = new Float32Array(analyserRef.current.fftSize);
           analyserRef.current.getFloatTimeDomainData(buffer);
           const pitch = autoCorrelate(buffer, audioContextRef.current.sampleRate);
-          onPitchDetectedRef.current(pitch > 0 ? pitch : null, buffer);
+          onPitchDetectedRef.current(pitch > 0 ? pitch : null);
         }, sampleIntervalMs);
       } catch (err) {
         if (!cancelled) {

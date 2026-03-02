@@ -4,7 +4,7 @@ Scale Tuner is a React + Vite browser game for violin practice. Players perform 
 
 ## Architecture Overview
 
-**Module Structure**: Game logic is split across focused standalone modules; `scales-tuner.tsx` is the main orchestrator (~1100 lines, React state only). UI components live in `src/components/`.
+**Module Structure**: Game logic is split across focused standalone modules; `scales-tuner.tsx` is the main orchestrator (~900 lines, useReducer + game screen). UI components live in `src/components/`.
 
 ```
 src/
@@ -12,12 +12,16 @@ src/
 ├── constants.ts              # GAME_CONFIG, MULTIPLIER_TIERS
 ├── audio/
 │   ├── pitchDetection.ts     # autoCorrelate, getCents
-│   └── playTone.ts           # playTone
+│   ├── playTone.ts           # playTone
+│   └── useAudioPitchDetection.ts  # Hook: mic + AudioContext lifecycle
 ├── game/
 │   ├── scales.ts             # NOTE_FREQUENCIES, SCALES, key signature helpers
 │   ├── scoring.ts            # trimmedMeanAbs, notePointsFromE, getTotalScore
 │   ├── settings.ts           # DEFAULT_SETTINGS, SETTINGS_RANGES, load/save
-│   └── scores.ts             # saveScore, loadScores, clearScores
+│   ├── scores.ts             # saveScore, loadScores, clearScores
+│   └── gameState.ts          # GameStateData, GameAction, gameReducer
+├── styles/
+│   └── tokens.ts             # Design tokens: colors, gradients, spacing
 ├── utils/
 │   └── formatting.ts         # formatNoteDisplay, formatScaleName, color/angle helpers
 ├── components/
@@ -27,9 +31,10 @@ src/
 │   ├── FallingBrick.tsx      # Animated falling brick
 │   ├── ScoreSummary.tsx      # End-of-game score display with animation
 │   ├── MenuScreen.tsx        # Main menu UI
-│   ├── SettingsScreen.tsx    # Settings sliders and toggles
+│   ├── SettingSlider.tsx     # Reusable labeled range slider
+│   ├── SettingsScreen.tsx    # Settings sliders and toggles (uses SettingSlider)
 │   └── ScoresScreen.tsx      # Score history display
-└── scales-tuner.tsx          # Main orchestrator (React state + game screen render)
+└── scales-tuner.tsx          # Main orchestrator (useReducer + game screen render)
 ```
 
 **Tech Stack**:
@@ -39,8 +44,8 @@ src/
 - VexFlow for music notation rendering
 
 **Game Loop**:
-1. Microphone input → autocorrelation pitch detection
-2. Compare detected frequency to target note frequency (in cents)
+1. `useAudioPitchDetection` hook captures mic → calls `onPitchDetected(pitch)` at ~40Hz
+2. `handlePitchDetected` callback compares pitch to target (in cents)
 3. Collect accuracy samples when within `SAME_NOTE_THRESHOLD` (50¢)
 4. Practice mode: Advance when continuously within OK threshold for hold duration
 5. Test mode: Auto-advance after accumulating hold duration of in-range time
@@ -71,9 +76,13 @@ The only non-configurable constant is `GAME_CONFIG.SAME_NOTE_THRESHOLD` (50¢) i
 
 ## Critical Functions
 
+**Audio Hook** (`src/audio/useAudioPitchDetection.ts`): `useAudioPitchDetection({ enabled, onPitchDetected })` — manages mic lifecycle; calls `onPitchDetected(pitch | null)` at ~40Hz when enabled.
+
 **Pitch Detection** (`src/audio/pitchDetection.ts`): `autoCorrelate(buffer, sampleRate)` — autocorrelation with RMS threshold (0.01) to reject noise. Returns Hz or -1.
 
 **Accuracy** (`src/audio/pitchDetection.ts`): `getCents(frequency, targetFrequency)` = `1200 * log₂(freq / target)`. Positive = sharp, negative = flat.
+
+**State Management** (`src/game/gameState.ts`): `gameReducer(state, action)` — pure reducer for all game state. Key actions: `START_GAME`, `NOTE_ACCEPTED`, `TOWER_COLLAPSED`, `SCALE_COMPLETED`, `TICK`, `UPDATE_SETTINGS`.
 
 **Scoring** (`src/game/scoring.ts`): `trimmedMeanAbs(samples, trimTop)` — computes robust error statistic E by:
 1. Taking absolute value of all samples
@@ -111,23 +120,26 @@ Push to `main` triggers GitHub Actions deployment to GitHub Pages.
 
 **Adjust Defaults**: Edit `DEFAULT_SETTINGS` or `SETTINGS_RANGES` in `src/game/settings.ts`.
 
-**Modify Colors**: Edit `getColorFromError()` in `src/utils/formatting.ts`.
+**Modify Colors**: Edit `getColorFromError()` in `src/utils/formatting.ts` for brick/indicator colors. Edit `src/styles/tokens.ts` for UI chrome colors.
+
+**Add a Settings Slider**: Use `<SettingSlider>` in `SettingsScreen.tsx` — it takes label, value, range, onChange, and optionally left/right labels and a `defaultPercent` marker.
 
 **Modify UI Components**: Each screen and widget lives in its own file under `src/components/`. The main game screen (playing state) is rendered inline in `src/scales-tuner.tsx`.
 
 ## Audio Pipeline
 
-1. `getUserMedia({ audio: true })` requests microphone
-2. `AudioContext` + `AnalyserNode` (fftSize 2048)
-3. Audio processing runs at ~40Hz via `setInterval` (decoupled from rAF for iOS compatibility)
-4. Visual updates via `requestAnimationFrame`
-5. `playTone()` generates reference tones with harmonics
+1. `useAudioPitchDetection` hook responds to `isListening` state becoming `true`
+2. `getUserMedia({ audio: true })` requests microphone
+3. `AudioContext` + `AnalyserNode` (fftSize 2048)
+4. Hook runs pitch detection at ~40Hz via `setInterval` (decoupled from rAF for iOS compatibility)
+5. Visual updates via `requestAnimationFrame` in a separate effect
+6. `playTone()` generates reference tones with harmonics
 
 ## Debugging
 
 - Console for audio errors
-- React DevTools for `gameState`, `settings`, `bricks`, `instability`
-- iOS Safari throttles rAF—audio loop uses `setInterval` for reliability
+- React DevTools: inspect the `state` object (from `useReducer`) — contains all game state including `screen`, `bricks`, `instability`, `score`, `settings`
+- iOS Safari throttles rAF — audio hook uses `setInterval` for reliability
 
 ## Commit Message Format
 

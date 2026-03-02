@@ -231,6 +231,7 @@ export default function ViolinTunerGame(): ReactNode {
     // Prepare for next autoplay note
     autoplayNoteStartTimeRef.current = null;
     autoplayTimeoutRef.current = setTimeout(() => {
+      // Reset the audio→visual ref directly; the rAF loop will sync it to state on the next frame
       latestHoldProgressRef.current = 0;
       autoplayNoteStartTimeRef.current = Date.now();
       const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
@@ -242,8 +243,6 @@ export default function ViolinTunerGame(): ReactNode {
 
   // Game logic callback passed to the audio hook — runs on every pitch sample (~25ms)
   const handlePitchDetected = useCallback((pitch: number | null) => {
-    // Flag to prevent double-acceptance in same tick
-    // (reset implicitly: each call is a new invocation)
 
     // Handle autoplay note completion
     if (isAutoplayMode && autoplayNoteStartTimeRef.current) {

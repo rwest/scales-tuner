@@ -31,6 +31,7 @@ export default function SettingsScreen({
   const toggleScale = (scaleName: string) => {
     const current = settings.enabledScales;
     if (current.includes(scaleName)) {
+      // Don't allow disabling the last scale
       if (current.length > 1) {
         onUpdateSetting('enabledScales', current.filter(s => s !== scaleName));
       }
