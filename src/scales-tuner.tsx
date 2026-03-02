@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
-import type { GameState, GameMode, Brick, TuningIndicator, GameSettings } from './types';
+import React, { useReducer, useEffect, useRef, useCallback, ReactNode } from 'react';
+import type { TuningIndicator } from './types';
 import { GAME_CONFIG, MULTIPLIER_TIERS } from './constants';
 import { NOTE_FREQUENCIES, SCALES, getKeySignatureForScale } from './game/scales';
 import { trimmedMeanAbs, notePointsFromE, getTotalScore } from './game/scoring';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './game/settings';
+import { DEFAULT_SETTINGS, saveSettings } from './game/settings';
 import { saveScore } from './game/scores';
 import { autoCorrelate, getCents } from './audio/pitchDetection';
 import { playTone } from './audio/playTone';
 import { getAngleFromError, getColorFromError, formatNoteDisplay, formatScaleName } from './utils/formatting';
+import { gameReducer, createInitialState } from './game/gameState';
 import StaveNoteDisplay from './components/StaveNoteDisplay';
 import PitchIndicator from './components/PitchIndicator';
 import Brick from './components/Brick';
@@ -19,32 +20,14 @@ import SettingsScreen from './components/SettingsScreen';
 
 // Main game component
 export default function ViolinTunerGame(): ReactNode {
-  const [gameState, setGameState] = useState<GameState>('menu');
-  const [gameMode, setGameMode] = useState<GameMode>('practice');
-  const [settings, setSettings] = useState<GameSettings>(() => loadSettings());
-  const [selectedScale, setSelectedScale] = useState<string>(() => {
-    const loaded = loadSettings();
-    return loaded.enabledScales[0] || 'G Major';
-  });
-  const [currentNoteIndex, setCurrentNoteIndex] = useState<number>(0);
-  const [bricks, setBricks] = useState<Brick[]>([]);
-  const [instability, setInstability] = useState<number>(0);
-  const [currentPitch, setCurrentPitch] = useState<number | null>(null);
-  const [currentCents, setCurrentCents] = useState<number>(0);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [holdProgress, setHoldProgress] = useState<number>(0);
-  const [collapseTime, setCollapseTime] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [noCollapse, setNoCollapse] = useState<boolean>(settings.noCollapse);
-  const [score, setScore] = useState<number>(0);
-  const [noteScores, setNoteScores] = useState<number[]>([]);
-  const [isPausedBetweenNotes, setIsPausedBetweenNotes] = useState<boolean>(false);
-  const [pauseAverageCents, setPauseAverageCents] = useState<number>(0);
-  const [hideTunerWhenPlaying, setHideTunerWhenPlaying] = useState<boolean>(settings.hideTunerWhenPlaying);
-  const [isAutoplayMode, setIsAutoplayMode] = useState<boolean>(false);
-  const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
-  const [replayProgress, setReplayProgress] = useState<number>(0);
-  const [fluencyFraction, setFluencyFraction] = useState<number>(0);
+  const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
+  const {
+    screen: gameState, gameMode, settings, selectedScale, currentNoteIndex,
+    bricks, instability, currentPitch, currentCents, isListening, holdProgress,
+    collapseTime, error, noCollapse, score, noteScores, isPausedBetweenNotes,
+    pauseAverageCents, hideTunerWhenPlaying, isAutoplayMode, updateAvailable,
+    replayProgress, fluencyFraction,
+  } = state;
   const replayAnimRef = useRef<number | null>(null);
 
   // Derived thresholds from settings
@@ -84,7 +67,7 @@ export default function ViolinTunerGame(): ReactNode {
   // Auto-replay countdown after success
   useEffect(() => {
     if ((gameState !== 'success' && gameState !== 'collapsed') || !settings.autoReplay) {
-      setReplayProgress(0);
+      dispatch({ type: 'SET_REPLAY_PROGRESS', progress: 0 });
       replayStartRef.current = null;
       if (replayAnimRef.current !== null) {
         cancelAnimationFrame(replayAnimRef.current);
@@ -97,7 +80,7 @@ export default function ViolinTunerGame(): ReactNode {
     const animate = (now: number) => {
       const elapsed = now - (replayStartRef.current ?? now);
       const progress = Math.min(elapsed / REPLAY_DELAY, 1);
-      setReplayProgress(progress);
+      dispatch({ type: 'SET_REPLAY_PROGRESS', progress });
       if (progress < 1) {
         replayAnimRef.current = requestAnimationFrame(animate);
       } else {
@@ -115,9 +98,7 @@ export default function ViolinTunerGame(): ReactNode {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, settings.autoReplay, settings.autoReplayDelay]);
 
-  const startGame = async (mode: GameMode) => {
-    setError(null);
-    setGameMode(mode);
+  const startGame = async (mode: typeof gameMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -134,18 +115,7 @@ export default function ViolinTunerGame(): ReactNode {
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      setGameState('playing');
-      setCurrentNoteIndex(0);
-      setBricks([]);
-      setInstability(0);
-      setIsListening(true);
-      setHoldProgress(0);
-      setScore(0);
-      setNoteScores([]);
-      setIsPausedBetweenNotes(false);
-      setIsAutoplayMode(false);
-      setPauseAverageCents(0);
-      setFluencyFraction(0);
+      dispatch({ type: 'START_GAME', mode });
       holdStartRef.current = null;
       noteStartTimeRef.current = null;
       accumulatedInRangeRef.current = 0;
@@ -155,13 +125,13 @@ export default function ViolinTunerGame(): ReactNode {
       fluencyTotalSamplesRef.current = 0;
       fluencyStartedRef.current = false;
     } catch (err) {
-      setError('Microphone access denied. Please allow microphone access and try again.');
+      dispatch({ type: 'SET_ERROR', error: 'Microphone access denied. Please allow microphone access and try again.' });
       console.error(err);
     }
   };
 
   const startAutoplay = async () => {
-    setIsAutoplayMode(true);
+    dispatch({ type: 'SET_AUTOPLAY', active: true });
     autoplayNoteStartTimeRef.current = Date.now();
     const initialFrequency = targetFrequency;
     if (initialFrequency) {
@@ -170,7 +140,7 @@ export default function ViolinTunerGame(): ReactNode {
   };
 
   const stopAutoplay = () => {
-    setIsAutoplayMode(false);
+    dispatch({ type: 'SET_AUTOPLAY', active: false });
     if (autoplayTimeoutRef.current) {
       clearTimeout(autoplayTimeoutRef.current);
       autoplayTimeoutRef.current = null;
@@ -178,8 +148,6 @@ export default function ViolinTunerGame(): ReactNode {
   };
 
   const stopGame = useCallback(() => {
-    setIsListening(false);
-    setIsAutoplayMode(false);
     if (autoplayTimeoutRef.current) {
       clearTimeout(autoplayTimeoutRef.current);
       autoplayTimeoutRef.current = null;
@@ -208,32 +176,20 @@ export default function ViolinTunerGame(): ReactNode {
     const newBrick = { index: bricks.length, error, angle, color, note: currentNote, points: notePoints, basePoints, multiplier };
     const newInstability = instability + Math.abs(angle);
 
-    setBricks(prev => [...prev, newBrick]);
-    setInstability(newInstability);
-
-    setNoteScores(prev => {
-      const arr = [...prev, notePoints];
-      const totalPoints = Math.round(arr.reduce((a, b) => a + b, 0));
-      setScore(totalPoints);
-      return arr;
-    });
-
     if (newInstability >= COLLAPSE_THRESHOLD * scale.notes.length && !noCollapse) {
-      setGameState('collapsed');
-      setCollapseTime(Date.now());
+      dispatch({ type: 'TOWER_COLLAPSED', brick: newBrick, points: notePoints });
       stopGame();
       return true; // ended
     }
 
     if (currentNoteIndex + 1 >= scale.notes.length) {
-      setGameState('success');
+      dispatch({ type: 'SCALE_COMPLETED', brick: newBrick, points: notePoints });
       stopGame();
       return true; // ended
     }
 
-    // Advance the display to the next note and enter pause between notes
-    setCurrentNoteIndex(prev => prev + 1);
-    setIsPausedBetweenNotes(true);
+    // Advance to next note and enter pause
+    dispatch({ type: 'NOTE_ACCEPTED', brick: newBrick, points: notePoints });
     pauseStartTimeRef.current = Date.now();
     holdStartRef.current = null;
     noteStartTimeRef.current = null;
@@ -251,9 +207,6 @@ export default function ViolinTunerGame(): ReactNode {
     // Keep sign logic for visuals (brick angle/color)
     const bias = noteSamplesRef.current.reduce((sum, c) => sum + c, 0);
     const signedError = E * (bias > 0 ? 1 : -1);
-
-    // Show signed typical cents during pause
-    setPauseAverageCents(signedError);
 
     // Compute points for this note (two-part: accuracy + bonus)
     const basePts = notePointsFromE(E, GOOD, settings);
@@ -302,14 +255,14 @@ export default function ViolinTunerGame(): ReactNode {
     const nextIndex = currentNoteIndex + 1; // next note to play
     const ended = handleAddNote(0, noteError);
     if (ended) {
-      setIsAutoplayMode(false);
+      dispatch({ type: 'SET_AUTOPLAY', active: false });
       return;
     }
 
     // Prepare for next autoplay note
     autoplayNoteStartTimeRef.current = null;
     autoplayTimeoutRef.current = setTimeout(() => {
-      setHoldProgress(0);
+      latestHoldProgressRef.current = 0;
       autoplayNoteStartTimeRef.current = Date.now();
       const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
       if (nextTargetFrequency) {
@@ -344,9 +297,7 @@ export default function ViolinTunerGame(): ReactNode {
       accumulatedInRangeRef.current = 0;
       noteSamplesRef.current = [];
       latestHoldProgressRef.current = 0;
-      setHoldProgress(0);
-      setIsPausedBetweenNotes(false);
-      setPauseAverageCents(0);
+      dispatch({ type: 'EXIT_PAUSE' });
       pauseStartTimeRef.current = null;
     };
 
@@ -472,9 +423,7 @@ export default function ViolinTunerGame(): ReactNode {
       if (!isListening) return;
 
       // Sync ref values to React state for rendering
-      setCurrentPitch(latestPitchRef.current);
-      setCurrentCents(latestCentsRef.current);
-      setHoldProgress(latestHoldProgressRef.current);
+      dispatch({ type: 'TICK', pitch: latestPitchRef.current, cents: latestCentsRef.current, holdProgress: latestHoldProgressRef.current });
 
       animationRef.current = requestAnimationFrame(updateVisuals);
     };
@@ -502,7 +451,7 @@ export default function ViolinTunerGame(): ReactNode {
       const fTotal = fluencyTotalSamplesRef.current;
       const fInTune = fluencyInTuneSamplesRef.current;
       const frac = fTotal > 0 ? fInTune / fTotal : 0;
-      setFluencyFraction(frac);
+      dispatch({ type: 'SET_FLUENCY', fraction: frac });
       const { totalScore } = getTotalScore(score, frac, settings);
       saveScore({
         datetime: new Date().toISOString(),
@@ -555,7 +504,7 @@ export default function ViolinTunerGame(): ReactNode {
 
         if (!isNaN(remote) && !isNaN(current) && remote > current) {
           console.log(`Update available: ${current} -> ${remote}`);
-          setUpdateAvailable(true);
+          dispatch({ type: 'SET_UPDATE_AVAILABLE', available: true });
         } else {
           console.log(`No update available (current: ${current}, remote: ${remote})`);
         }
@@ -598,42 +547,40 @@ export default function ViolinTunerGame(): ReactNode {
 
   // Callbacks for MenuScreen
   const handleNoCollapseChange = (val: boolean) => {
-    setNoCollapse(val);
     const newSettings = { ...settings, noCollapse: val };
-    setSettings(newSettings);
+    dispatch({ type: 'UPDATE_SETTINGS', settings: newSettings });
     saveSettings(newSettings);
   };
 
   const handleHideTunerChange = (val: boolean) => {
-    setHideTunerWhenPlaying(val);
     const newSettings = { ...settings, hideTunerWhenPlaying: val };
-    setSettings(newSettings);
+    dispatch({ type: 'UPDATE_SETTINGS', settings: newSettings });
     saveSettings(newSettings);
   };
 
   const handleAutoReplayChange = (val: boolean) => {
     const newSettings = { ...settings, autoReplay: val };
-    setSettings(newSettings);
+    dispatch({ type: 'UPDATE_SETTINGS', settings: newSettings });
     saveSettings(newSettings);
   };
 
   // Callbacks for SettingsScreen
-  const handleUpdateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
+  const handleUpdateSetting = <K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) => {
     const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
+    dispatch({ type: 'UPDATE_SETTINGS', settings: newSettings });
     saveSettings(newSettings);
     if (key === 'enabledScales') {
-      const newScales = value as GameSettings['enabledScales'];
+      const newScales = value as string[];
       if (!newScales.includes(selectedScale)) {
-        setSelectedScale(newScales[0] || 'G Major');
+        dispatch({ type: 'SELECT_SCALE', scale: newScales[0] || 'G Major' });
       }
     }
   };
 
   const handleResetDefaults = () => {
-    setSettings({ ...DEFAULT_SETTINGS });
+    dispatch({ type: 'UPDATE_SETTINGS', settings: { ...DEFAULT_SETTINGS } });
     saveSettings({ ...DEFAULT_SETTINGS });
-    setSelectedScale(DEFAULT_SETTINGS.enabledScales[0]);
+    dispatch({ type: 'SELECT_SCALE', scale: DEFAULT_SETTINGS.enabledScales[0] });
   };
 
   // Menu screen
@@ -646,10 +593,10 @@ export default function ViolinTunerGame(): ReactNode {
         hideTunerWhenPlaying={hideTunerWhenPlaying}
         error={error}
         updateAvailable={updateAvailable}
-        onSelectScale={setSelectedScale}
+        onSelectScale={(scale) => dispatch({ type: 'SELECT_SCALE', scale })}
         onStart={(mode) => void startGame(mode)}
-        onOpenSettings={() => setGameState('settings')}
-        onOpenScores={() => setGameState('scores')}
+        onOpenSettings={() => dispatch({ type: 'SET_SCREEN', screen: 'settings' })}
+        onOpenScores={() => dispatch({ type: 'SET_SCREEN', screen: 'scores' })}
         onNoCollapseChange={handleNoCollapseChange}
         onHideTunerChange={handleHideTunerChange}
         onAutoReplayChange={handleAutoReplayChange}
@@ -659,7 +606,7 @@ export default function ViolinTunerGame(): ReactNode {
 
    // Scores page
   if (gameState === 'scores') {
-    return <ScoresScreen onBack={() => setGameState('menu')} />;
+    return <ScoresScreen onBack={() => dispatch({ type: 'SET_SCREEN', screen: 'menu' })} />;
   }
   
   // Settings screen
@@ -669,7 +616,7 @@ export default function ViolinTunerGame(): ReactNode {
         settings={settings}
         onUpdateSetting={handleUpdateSetting}
         onResetDefaults={handleResetDefaults}
-        onDone={() => setGameState('menu')}
+        onDone={() => dispatch({ type: 'SET_SCREEN', screen: 'menu' })}
       />
     );
   }
@@ -974,7 +921,7 @@ export default function ViolinTunerGame(): ReactNode {
           />
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
-              onClick={() => setGameState('menu')}
+              onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'menu' })}
               style={{
                 flex: 1,
                 width: '150px',
@@ -1027,7 +974,7 @@ export default function ViolinTunerGame(): ReactNode {
           />
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 300 }}>
             <button
-              onClick={() => setGameState('menu')}
+              onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'menu' })}
               style={{
                 flex: 1,
                 width: '150px',
@@ -1068,7 +1015,7 @@ export default function ViolinTunerGame(): ReactNode {
       {gameState === 'playing' && (
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16, maxWidth: 450, flexShrink: 0 }}>
           <button
-            onClick={() => { stopGame(); setGameState('menu'); }}
+            onClick={() => { stopGame(); dispatch({ type: 'SET_SCREEN', screen: 'menu' }); }}
             style={{
               flex: 1,
               width: '100px',
