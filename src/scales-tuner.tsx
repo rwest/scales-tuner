@@ -5,7 +5,8 @@ import { NOTE_FREQUENCIES, SCALES, getKeySignatureForScale } from './game/scales
 import { trimmedMeanAbs, notePointsFromE, getTotalScore } from './game/scoring';
 import { DEFAULT_SETTINGS, saveSettings } from './game/settings';
 import { saveScore } from './game/scores';
-import { autoCorrelate, getCents } from './audio/pitchDetection';
+import { getCents } from './audio/pitchDetection';
+import { useAudioPitchDetection } from './audio/useAudioPitchDetection';
 import { playTone } from './audio/playTone';
 import { getAngleFromError, getColorFromError, formatNoteDisplay, formatScaleName } from './utils/formatting';
 import { gameReducer, createInitialState } from './game/gameState';
@@ -24,7 +25,7 @@ export default function ViolinTunerGame(): ReactNode {
   const {
     screen: gameState, gameMode, settings, selectedScale, currentNoteIndex,
     bricks, instability, currentPitch, currentCents, isListening, holdProgress,
-    collapseTime, error, noCollapse, score, noteScores, isPausedBetweenNotes,
+    collapseTime, error, noCollapse, score, isPausedBetweenNotes,
     pauseAverageCents, hideTunerWhenPlaying, isAutoplayMode, updateAvailable,
     replayProgress, fluencyFraction,
   } = state;
@@ -37,12 +38,8 @@ export default function ViolinTunerGame(): ReactNode {
   const HOLD_DURATION = settings.holdDuration;
   const PAUSE_BETWEEN_NOTES = settings.pauseBetweenNotes;
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
-  const audioIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdStartRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const noteStartTimeRef = useRef<number | null>(null);
   const accumulatedInRangeRef = useRef<number>(0);
   const noteSamplesRef = useRef<number[]>([]);
@@ -98,36 +95,17 @@ export default function ViolinTunerGame(): ReactNode {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, settings.autoReplay, settings.autoReplayDelay]);
 
-  const startGame = async (mode: typeof gameMode) => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const audioContext = new AudioContextClass();
-      await audioContext.resume();
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-
-      dispatch({ type: 'START_GAME', mode });
-      holdStartRef.current = null;
-      noteStartTimeRef.current = null;
-      accumulatedInRangeRef.current = 0;
-      noteSamplesRef.current = [];
-      goodStreakRef.current = 0;
-      fluencyInTuneSamplesRef.current = 0;
-      fluencyTotalSamplesRef.current = 0;
-      fluencyStartedRef.current = false;
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: 'Microphone access denied. Please allow microphone access and try again.' });
-      console.error(err);
-    }
+  const startGame = (mode: typeof gameMode) => {
+    // Audio setup is handled by useAudioPitchDetection (responds to isListening)
+    dispatch({ type: 'START_GAME', mode });
+    holdStartRef.current = null;
+    noteStartTimeRef.current = null;
+    accumulatedInRangeRef.current = 0;
+    noteSamplesRef.current = [];
+    goodStreakRef.current = 0;
+    fluencyInTuneSamplesRef.current = 0;
+    fluencyTotalSamplesRef.current = 0;
+    fluencyStartedRef.current = false;
   };
 
   const startAutoplay = async () => {
@@ -148,6 +126,7 @@ export default function ViolinTunerGame(): ReactNode {
   };
 
   const stopGame = useCallback(() => {
+    // Audio teardown handled by useAudioPitchDetection (responds to isListening: false)
     if (autoplayTimeoutRef.current) {
       clearTimeout(autoplayTimeoutRef.current);
       autoplayTimeoutRef.current = null;
@@ -155,16 +134,6 @@ export default function ViolinTunerGame(): ReactNode {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
-    }
-    if (audioIntervalRef.current) {
-      clearInterval(audioIntervalRef.current);
-      audioIntervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    if (audioContextRef.current) {
-      void audioContextRef.current.close();
     }
   }, []);
 
@@ -271,18 +240,58 @@ export default function ViolinTunerGame(): ReactNode {
     }, PAUSE_BETWEEN_NOTES);
   }, [isAutoplayMode, currentNoteIndex, scale, handleAddNote, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
 
-  useEffect(() => {
-    if (!isListening) return;
+  // Game logic callback passed to the audio hook — runs on every pitch sample (~25ms)
+  const handlePitchDetected = useCallback((pitch: number | null) => {
+    // Flag to prevent double-acceptance in same tick
+    // (reset implicitly: each call is a new invocation)
 
-    // Cancel any orphaned timers before starting new loops
-    if (animationRef.current !== null) {
-      cancelAnimationFrame(animationRef.current);
-      animationRef.current = null;
+    // Handle autoplay note completion
+    if (isAutoplayMode && autoplayNoteStartTimeRef.current) {
+      const autoplayElapsed = Date.now() - autoplayNoteStartTimeRef.current;
+      latestHoldProgressRef.current = Math.min(autoplayElapsed / HOLD_DURATION, 1);
+      if (autoplayElapsed >= HOLD_DURATION) {
+        const noteError = noteSamplesRef.current.length > 0
+          ? trimmedMeanAbs(noteSamplesRef.current, settings.trimTop) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
+          : 0;
+        noteSamplesRef.current = [];
+        advanceAutoplayNote(noteError);
+        autoplayNoteStartTimeRef.current = null;
+        latestHoldProgressRef.current = 0;
+        return;
+      }
     }
-    if (audioIntervalRef.current !== null) {
-      clearInterval(audioIntervalRef.current);
-      audioIntervalRef.current = null;
+
+    // Fluency tracking: only start counting after the first in-tune sample
+    if (pitch !== null && pitch > 150 && pitch < 1500) {
+      const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[scale.notes[currentNoteIndex - 1]] : null;
+      const nextNoteFreq = targetFrequency;
+      const nearPrev = prevNoteFreq ? Math.abs(getCents(pitch, prevNoteFreq)) < OK_THRESHOLD : false;
+      const nearNext = nextNoteFreq ? Math.abs(getCents(pitch, nextNoteFreq)) < OK_THRESHOLD : false;
+      if (nearPrev || nearNext) {
+        fluencyStartedRef.current = true;
+        fluencyInTuneSamplesRef.current += 1;
+      }
     }
+    if (fluencyStartedRef.current) {
+      fluencyTotalSamplesRef.current += 1;
+    }
+
+    // Handle pause between notes (display only — fluency already tracked above)
+    if (isPausedBetweenNotes && pauseStartTimeRef.current) {
+      const pauseElapsed = Date.now() - pauseStartTimeRef.current;
+      if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
+        holdStartRef.current = null;
+        noteStartTimeRef.current = null;
+        accumulatedInRangeRef.current = 0;
+        noteSamplesRef.current = [];
+        latestHoldProgressRef.current = 0;
+        dispatch({ type: 'EXIT_PAUSE' });
+        pauseStartTimeRef.current = null;
+      }
+      return;
+    }
+
+    if (isPausedBetweenNotes) return;
 
     const pauseInRangeTimer = () => {
       if (noteStartTimeRef.current) {
@@ -291,145 +300,89 @@ export default function ViolinTunerGame(): ReactNode {
       }
     };
 
-    const resetForNextNote = () => {
-      holdStartRef.current = null;
-      noteStartTimeRef.current = null;
-      accumulatedInRangeRef.current = 0;
-      noteSamplesRef.current = [];
-      latestHoldProgressRef.current = 0;
-      dispatch({ type: 'EXIT_PAUSE' });
-      pauseStartTimeRef.current = null;
-    };
+    if (pitch !== null && pitch > 150 && pitch < 1500) {
+      latestPitchRef.current = pitch;
+      const cents = getCents(pitch, targetFrequency);
+      latestCentsRef.current = cents;
 
-    // Flag to track if we've already accepted the note this cycle
-    let noteAcceptedThisCycle = false;
+      const withinSameNote = Math.abs(cents) < GAME_CONFIG.SAME_NOTE_THRESHOLD;
 
-    // HIGH-FREQUENCY AUDIO SAMPLING (runs every ~25ms regardless of rAF throttling)
-    // This ensures pitch detection stays responsive even when iOS throttles animations
-    const processAudio = () => {
-      if (!analyserRef.current || !isListening || noteAcceptedThisCycle) return;
+      if (withinSameNote) {
+        noteSamplesRef.current.push(cents);
 
-      // Handle autoplay note completion
-      if (isAutoplayMode && autoplayNoteStartTimeRef.current) {
-        const autoplayElapsed = Date.now() - autoplayNoteStartTimeRef.current;
-        latestHoldProgressRef.current = Math.min(autoplayElapsed / HOLD_DURATION, 1);
-        if (autoplayElapsed >= HOLD_DURATION) {
-          const noteError = noteSamplesRef.current.length > 0 
-            ? trimmedMeanAbs(noteSamplesRef.current, settings.trimTop) * (noteSamplesRef.current.reduce((sum, c) => sum + c, 0) > 0 ? 1 : -1)
-            : 0;
-          noteSamplesRef.current = [];
-          noteAcceptedThisCycle = true;
-          advanceAutoplayNote(noteError);
-          autoplayNoteStartTimeRef.current = null;
-          latestHoldProgressRef.current = 0;
-          return;
+        if (!noteStartTimeRef.current) {
+          noteStartTimeRef.current = Date.now();
         }
-      }
 
-      // --- Fluency tracking: sample audio on every tick for the whole scale ---
-      // Read audio buffer once; reused for both fluency and normal processing
-      const buffer = new Float32Array(analyserRef.current.fftSize);
-      analyserRef.current.getFloatTimeDomainData(buffer);
-      const pitch = autoCorrelate(buffer, audioContextRef.current!.sampleRate);
-
-      // Fluency tracking: only start counting after the first in-tune sample
-      if (pitch > 150 && pitch < 1500) {
-        const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[scale.notes[currentNoteIndex - 1]] : null;
-        const nextNoteFreq = targetFrequency;
-        const nearPrev = prevNoteFreq ? Math.abs(getCents(pitch, prevNoteFreq)) < OK_THRESHOLD : false;
-        const nearNext = nextNoteFreq ? Math.abs(getCents(pitch, nextNoteFreq)) < OK_THRESHOLD : false;
-        if (nearPrev || nearNext) {
-          fluencyStartedRef.current = true;
-          fluencyInTuneSamplesRef.current += 1;
-        }
-      }
-      // Only count towards total once fluency tracking has started
-      if (fluencyStartedRef.current) {
-        fluencyTotalSamplesRef.current += 1;
-      }
-
-      // Handle pause between notes (display only — fluency already tracked above)
-      if (isPausedBetweenNotes && pauseStartTimeRef.current) {
-        const pauseElapsed = Date.now() - pauseStartTimeRef.current;
-        if (pauseElapsed >= PAUSE_BETWEEN_NOTES) {
-          resetForNextNote();
-        }
-        return;
-      }
-
-      if (isPausedBetweenNotes) return;
-
-      if (pitch > 150 && pitch < 1500) {
-        latestPitchRef.current = pitch;
-        const cents = getCents(pitch, targetFrequency);
-        latestCentsRef.current = cents;
-
-        const withinSameNote = Math.abs(cents) < GAME_CONFIG.SAME_NOTE_THRESHOLD;
-
-        if (withinSameNote) {
-          noteSamplesRef.current.push(cents);
-
-          if (!noteStartTimeRef.current) {
-            noteStartTimeRef.current = Date.now();
-          }
-
-          if (gameMode === 'practice') {
-            if (Math.abs(cents) < OK_THRESHOLD) {
-              if (!holdStartRef.current) {
-                holdStartRef.current = Date.now();
-              }
-              const holdTime = Date.now() - holdStartRef.current;
-              if (!isAutoplayMode) {
-                latestHoldProgressRef.current = Math.min(holdTime / HOLD_DURATION, 1);
-              }
-
-              if (holdTime >= HOLD_DURATION) {
-                noteAcceptedThisCycle = true;
-                acceptNote();
-              }
-            } else {
-              holdStartRef.current = null;
-              latestHoldProgressRef.current = 0;
+        if (gameMode === 'practice') {
+          if (Math.abs(cents) < OK_THRESHOLD) {
+            if (!holdStartRef.current) {
+              holdStartRef.current = Date.now();
             }
-          } else {
-            const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
-
+            const holdTime = Date.now() - holdStartRef.current;
             if (!isAutoplayMode) {
-              latestHoldProgressRef.current = Math.min(elapsedInRange / HOLD_DURATION, 1);
+              latestHoldProgressRef.current = Math.min(holdTime / HOLD_DURATION, 1);
             }
-            if (elapsedInRange >= HOLD_DURATION) {
-              noteAcceptedThisCycle = true;
+            if (holdTime >= HOLD_DURATION) {
               acceptNote();
             }
+          } else {
+            holdStartRef.current = null;
+            latestHoldProgressRef.current = 0;
           }
-        } else if (!isAutoplayMode) {
-          pauseInRangeTimer();
-          holdStartRef.current = null;
-          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
+        } else {
+          const elapsedInRange = accumulatedInRangeRef.current + (noteStartTimeRef.current ? Date.now() - noteStartTimeRef.current : 0);
+          if (!isAutoplayMode) {
+            latestHoldProgressRef.current = Math.min(elapsedInRange / HOLD_DURATION, 1);
+          }
+          if (elapsedInRange >= HOLD_DURATION) {
+            acceptNote();
+          }
         }
-      } else {
-        latestPitchRef.current = null;
-        if (!isAutoplayMode) {
-          pauseInRangeTimer();
-          holdStartRef.current = null;
-          latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
-        }
+      } else if (!isAutoplayMode) {
+        pauseInRangeTimer();
+        holdStartRef.current = null;
+        latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
       }
-    };
+    } else {
+      latestPitchRef.current = null;
+      if (!isAutoplayMode) {
+        pauseInRangeTimer();
+        holdStartRef.current = null;
+        latestHoldProgressRef.current = gameMode === 'test' ? Math.min(accumulatedInRangeRef.current / HOLD_DURATION, 1) : 0;
+      }
+    }
+  }, [isAutoplayMode, currentNoteIndex, scale, targetFrequency, isPausedBetweenNotes, gameMode,
+      OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES, settings.trimTop, advanceAutoplayNote, acceptNote]);
 
-    // VISUAL UPDATE LOOP (rAF - may be throttled by iOS, but that's OK for visuals)
-    // Reads from refs populated by the audio loop and updates React state for rendering
+  // Audio engine hook: handles mic access, AudioContext, and the 25ms sampling interval
+  const { error: audioError } = useAudioPitchDetection({
+    enabled: isListening,
+    onPitchDetected: handlePitchDetected,
+  });
+
+  // Surface mic permission errors from hook into game state
+  useEffect(() => {
+    if (audioError) {
+      dispatch({ type: 'SET_ERROR', error: audioError });
+    }
+  }, [audioError]);
+
+  // VISUAL UPDATE LOOP (rAF - may be throttled by iOS, but that's OK for visuals)
+  // Reads from refs populated by the audio hook and updates React state for rendering
+  useEffect(() => {
+    if (!isListening) return;
+
+    if (animationRef.current !== null) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+
     const updateVisuals = () => {
-      if (!isListening) return;
-
-      // Sync ref values to React state for rendering
       dispatch({ type: 'TICK', pitch: latestPitchRef.current, cents: latestCentsRef.current, holdProgress: latestHoldProgressRef.current });
-
       animationRef.current = requestAnimationFrame(updateVisuals);
     };
 
-    // Start both loops: audio at 40Hz (25ms), visuals at display refresh rate
-    audioIntervalRef.current = setInterval(processAudio, 25);
     animationRef.current = requestAnimationFrame(updateVisuals);
 
     return () => {
@@ -437,12 +390,8 @@ export default function ViolinTunerGame(): ReactNode {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
-      if (audioIntervalRef.current) {
-        clearInterval(audioIntervalRef.current);
-        audioIntervalRef.current = null;
-      }
     };
-  }, [isListening, targetFrequency, bricks, instability, currentNoteIndex, scale, stopGame, noCollapse, gameMode, noteScores, isPausedBetweenNotes, currentNote, isAutoplayMode, advanceAutoplayNote, handleAddNote, acceptNote, settings, OK_THRESHOLD, HOLD_DURATION, PAUSE_BETWEEN_NOTES]);
+  }, [isListening]);
 
   // After game ends, calculate and save final score.
   useEffect(() => {
