@@ -267,6 +267,7 @@ const SCALES: ScalesType = {
   },
   'Humoresque Measure': {
     notes: ['B4', 'A4', 'A4', 'F5', 'A4', 'G#4', 'F5', 'E5', 'B4', 'D5'],
+    notes: ['B4(1)', 'A4(0)', 'A4', 'F5(3)', 'A4(2)', 'G#4(1)', 'F5(3)', 'E5(2)', 'B4(1)', 'D5'],
   },
 };
 
@@ -414,9 +415,14 @@ function getKeySignatureForScale(scaleName: string): string {
   return keyMap[scaleName];
 }
 
+// Strip fingering annotation suffix e.g. 'B4(1)' -> 'B4'
+function stripFingering(note: string): string {
+  return note.replace(/\(\d+\)$/, '');
+}
+
 // Friendly display for note names (use sharp/flat symbols)
 function formatNoteDisplay(note: string): string {
-  return note.replace(/#/g, '♯').replace(/b(?=\d)/g, '♭');
+  return stripFingering(note).replace(/#/g, '♯').replace(/b(?=\d)/g, '♭');
 }
 
 // Friendly display for scale names (use sharp/flat symbols)
@@ -468,7 +474,7 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
     container.innerHTML = '';
 
     try {
-      const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
+      const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Annotation } = Vex.Flow;
 
       // Create SVG renderer
       const renderer = new Renderer(container as HTMLDivElement, Renderer.Backends.SVG);
@@ -485,13 +491,14 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
       stave.addClef('treble').addKeySignature(keySignature);
       stave.setContext(context).draw();
 
-      // Create the note - parse note string (e.g., "B3" -> "B/3", "Bb3" -> "Bb/3")
-      const noteParts = note.match(/([A-G])([#b]?)(\d)/);
+      // Create the note - parse note string (e.g., "B3" -> "B/3", "Bb3" -> "Bb/3", "B4(1)" -> "B/4" with fingering)
+      const noteParts = note.match(/([A-G])([#b]?)(\d)(?:\((\d+)\))?/);
       if (!noteParts) return;
 
       const noteLetter = noteParts[1];
       const accidental = noteParts[2];
       const octave = noteParts[3];
+      const fingering = noteParts[4] ?? null;
       const noteString = `${noteLetter}${accidental}/${octave}`;
 
       // Create note object (half note)
@@ -519,6 +526,13 @@ function StaveNoteDisplay({ note, keySignature }: StaveNoteDisplayProps): ReactN
 
       if (renderAcc) {
         noteObj.addModifier(new Accidental(renderAcc));
+      }
+
+      if (fingering) {
+        const annotation = new Annotation(fingering);
+        annotation.setVerticalJustification(Annotation.VerticalJustify.TOP);
+        annotation.setStyle({ fillStyle: 'white', strokeStyle: 'white' });
+        noteObj.addModifier(annotation);
       }
 
       // Set note color to white
@@ -824,7 +838,7 @@ export default function ViolinTunerGame(): ReactNode {
 
   const scale = SCALES[selectedScale];
   const currentNote = scale?.notes[currentNoteIndex];
-  const targetFrequency = NOTE_FREQUENCIES[currentNote];
+  const targetFrequency = NOTE_FREQUENCIES[stripFingering(currentNote)];
   // Clear all scores from localStorage
   function clearScores() {
     try {
@@ -1064,7 +1078,7 @@ export default function ViolinTunerGame(): ReactNode {
     autoplayTimeoutRef.current = setTimeout(() => {
       setHoldProgress(0);
       autoplayNoteStartTimeRef.current = Date.now();
-      const nextTargetFrequency = NOTE_FREQUENCIES[scale.notes[nextIndex]];
+      const nextTargetFrequency = NOTE_FREQUENCIES[stripFingering(scale.notes[nextIndex])];
       if (nextTargetFrequency) {
         void playTone(nextTargetFrequency, HOLD_DURATION / 1000);
       }
@@ -1136,7 +1150,7 @@ export default function ViolinTunerGame(): ReactNode {
 
       // Fluency tracking: only start counting after the first in-tune sample
       if (pitch > 150 && pitch < 1500) {
-        const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[scale.notes[currentNoteIndex - 1]] : null;
+        const prevNoteFreq = currentNoteIndex > 0 ? NOTE_FREQUENCIES[stripFingering(scale.notes[currentNoteIndex - 1])] : null;
         const nextNoteFreq = targetFrequency;
         const nearPrev = prevNoteFreq ? Math.abs(getCents(pitch, prevNoteFreq)) < OK_THRESHOLD : false;
         const nearNext = nextNoteFreq ? Math.abs(getCents(pitch, nextNoteFreq)) < OK_THRESHOLD : false;
