@@ -234,7 +234,7 @@ const NOTE_FREQUENCIES: NoteFrequencies = {
   // Flats and accidentals
   'Bb3': 233.08, 'Eb4': 311.13, 'Bb4': 466.16, 'Eb5': 622.25, 'Bb5': 932.33,
   'C#4': 277.18, 'C#5': 554.37, 'C#6': 1108.73,
-  'G#4': 415.30, 'G#5': 830.61,
+  'G#3': 207.65, 'G#4': 415.30, 'G#5': 830.61,
 };
 
 const SCALES: ScalesType = {
@@ -264,6 +264,9 @@ const SCALES: ScalesType = {
   },
   'Minuet Measure': {
     notes: ['G4', 'D5', 'F#4', 'C5', 'G4', 'Bb4', 'A4'],
+  },
+  'Humoresque Measure': {
+    notes: ['B4', 'A4', 'A4', 'F5', 'A4', 'G#4', 'F5', 'E5', 'B4', 'D5'],
   },
 };
 
@@ -406,6 +409,7 @@ function getKeySignatureForScale(scaleName: string): string {
     'D Minor Melodic': 'F', // D Melodic Minor has 1 flat
     'Tonalization 1A': 'G',
     'Minuet Measure': 'Bb',
+    'Humoresque Measure': 'D',
   };
   return keyMap[scaleName];
 }
